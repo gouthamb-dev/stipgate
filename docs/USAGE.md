@@ -214,7 +214,7 @@ decider = DeciderClient(
     mode="server",                    # fail closed on outage; never "heuristic" in production
 )
 queue = InMemoryReviewQueue()         # or any object with enqueue(ticket: ReviewTicket) -> None (SQS, LOS task API)
-handler = StipulationGuardrailHandler(decider, confidence_threshold=0.88, review_queue=queue)
+handler = StipulationGuardrailHandler(decider, confidence_threshold=0.80, check_threshold=0.85, review_queue=queue)
 extractor = BedrockExtractor()        # Nova Lite, us-east-1
 
 agent = Agent(

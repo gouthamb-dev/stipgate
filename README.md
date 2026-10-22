@@ -9,35 +9,50 @@
 `#strands-decider-2b` `#guardrails` · Built for the AWS Builder Center *Agent Experience Hackathon: Strands Decider*
 
 A Strands agent wants to call `clear_underwriting_condition` on an uploaded document. Before the tool runs,
-a Strands `InterventionHandler` asks Decider 2B one typed question: *is this the document the condition
-requires?* Only a confident `fully_compliant` lets Amazon Bedrock Nova Lite extract the figures. Everything
-else is halted with **zero LLM tokens** and sent to a human loan officer. Every error fails closed.
+a Strands `InterventionHandler` makes **one Decider 2B call** that answers two kinds of typed question:
+*is this the document the condition requires?* (a `choice`) and *is the required content there?* (yes/no
+`noul` checks). Plain code then checks the dates. Only a document that passes all three reaches Amazon
+Bedrock Nova Lite for extraction. Everything else is halted with **zero LLM tokens** and sent to a human
+loan officer. Every error fails closed.
 
 | | |
 |---|---|
 | **Decision pattern** | Guardrails: verify a tool call's arguments (the document) before the tool runs |
-| **Decider 2B question** | one `choice` question, three typed options, a one-line definition per option |
+| **Decider 2B questions** | one `choice` (3 typed options, a definition per option) + per-condition yes/no checks, in one request |
 | **Bedrock** | Nova Lite (`amazon.nova-lite-v1:0`) for extraction, and for OCR of scanned PDFs / images |
-| **Reusable asset** | `StipulationGuardrailHandler` + `build_question` / `build_criteria` ([recipe below](#the-reusable-decision-pattern)) |
+| **Reusable asset** | `StipulationGuardrailHandler` + `build_question` / `build_criteria` / `build_requirement_checks` ([recipe below](#the-reusable-decision-pattern)) |
 | **Runs on** | laptop (heuristic demo or local Decider), Docker Compose, or AWS (EC2 + CloudFront scripts included) |
 
 ---
 
-## Results on the live AWS deployment
+## Results: 100 held-out documents on the live deployment
 
-Real Decider 2B (int8, CPU) and real Nova Lite, measured through CloudFront in October 2026:
+Real Decider 2B (int8, CPU) and real Nova Lite, 2026-10-22. The LLM-only baseline gives Nova Lite the
+**same** question, options, requirement checks and date rule in words. Raw per-document results and the
+method: [benchmarks/](benchmarks/README.md).
 
-| Document | Expected | Decider 2B verdict | Confidence | Gate | Nova Lite |
+| Judge | Accuracy | Hallucinated approvals | False halts | Decision tokens | Decision p50 |
 |---|---|---|---|---|---|
-| SG-001 valid 30-day paystub | PROCEED | `fully_compliant` | 0.941 | PROCEED, **cleared** | 450 tokens, ~0.5 s |
-| SG-002 utility bill sent as income proof | HALTED | `invalid_unrelated_doc` | 0.816 | HALTED | **0 tokens** |
-| SG-003 two years of W-2s | PROCEED | `fully_compliant` | 0.910 | PROCEED, **cleared** | 584-639 tokens, ~0.4 s |
-| SG-004 truncated / corrupted OCR scan | HALTED | `ambiguous_requires_human_review` | 0.174 | HALTED | **0 tokens** |
-| PNG photo of SG-001 (upload) | PROCEED | `fully_compliant` | 0.948 | PROCEED, **cleared** | OCR ~2,000 tokens + 437 extraction |
+| **StipGate** (Decider 2B + date rule) | **100%** | **0 / 55** | **0 / 45** | **0** | 4.7 s (CPU) |
+| Nova Lite with the full rubric | 69% | 31 / 55 | 0 / 45 | 45,922 | 0.35 s |
+| StipGate v1 (type question only) | 69% | 21 / 55 | 10 / 45 | 0 | 2.7 s (CPU) |
 
-The gate itself takes 2.6-3.9 s per document on this 2-vCPU instance. Upstream publishes ~115 ms median on
-an RTX 3090 ([inference.md](https://github.com/strands-labs/strands-decider/blob/main/docs/inference.md)),
-so a GPU host is the way to a real-time gate.
+Nova Lite approved **every** stale paystub (12/12), **every** paystub missing the employer and YTD (8/8) and
+11 of 12 garbled scans, even though it was told the rules and today's date. StipGate caught all of them.
+
+The four core samples through the public endpoint:
+
+| Document | Decider 2B verdict | Confidence | Requirement check | Gate | Nova Lite |
+|---|---|---|---|---|---|
+| SG-001 valid 30-day paystub | `fully_compliant` | 0.967 | employer + YTD 0.95 | PROCEED, **cleared** | 450 tokens, 0.44 s |
+| SG-002 utility bill sent as income proof | `invalid_unrelated_doc` | 0.946 | employer + YTD 0.11 | HALTED | **0 tokens** |
+| SG-003 two years of W-2s | `fully_compliant` | 0.940 | two tax years 0.96 | PROCEED, **cleared** | 639 tokens, 0.52 s |
+| SG-004 truncated / corrupted OCR scan | `ambiguous_requires_human_review` | 0.237 | employer + YTD 0.38 | HALTED | **0 tokens** |
+
+On this 2-vCPU instance the gate takes 4-8 s per document. Upstream publishes ~115 ms median per question on
+an RTX 3090 ([inference.md](https://github.com/strands-labs/strands-decider/blob/main/docs/inference.md)), so
+a GPU host is the way to a real-time gate. Here the win is correctness, zero decision tokens, and no document
+text leaving the host before the gate.
 
 ---
 
@@ -59,9 +74,9 @@ flowchart TB
     end
 
     subgraph Gate["Decision: StipulationGuardrailHandler (strands.interventions)"]
-        Q["build_question(code) + build_criteria(code)<br/>options: fully_compliant · invalid_unrelated_doc ·<br/>ambiguous_requires_human_review"]
+        Q["One request: choice question + criteria<br/>(fully_compliant · invalid_unrelated_doc · ambiguous_requires_human_review)<br/>+ yes/no checks (employer + YTD · two tax years)"]
         DEC{{"Strands Decider 2B<br/>local sidecar, loopback / private network"}}
-        RULE{"fully_compliant<br/>AND confidence ≥ 0.88?"}
+        RULE{"fully_compliant ≥ 0.80<br/>AND every yes/no check ≥ 0.85<br/>AND date rule (code) passes?"}
     end
 
     subgraph Gen["Generation: Amazon Bedrock (us-east-1)"]
@@ -108,8 +123,16 @@ Sequence diagram, trust boundaries, PII flow and the fail-closed matrix: [docs/A
 
 ## The reusable decision pattern
 
-The asset other builders can drop into their own agent: **a typed question, an option set with a definition
-per option, and the wiring that puts it in front of a tool.**
+The asset other builders can drop into their own agent: **a typed question with a definition per option,
+yes/no requirement checks asked in the same call, a code rule for anything numeric, and the wiring that puts
+it in front of a tool.**
+
+```
+tool call ─► Decider 2B (one request) ─────────────► code rule ──────────► tool runs
+             choice: what is this document?          date within window?
+             noul:   is the required content there?
+             any "no", low confidence, error ─► HALT + human review, 0 tokens
+```
 
 ### 1. The question and options
 
@@ -149,13 +172,51 @@ What goes over the wire (official `strands-decider serve` contract, `POST /v1/sy
      "ambiguous_requires_human_review": "It is garbled, cut off or unreadable."}}}}
 ```
 
-> **Lesson learned.** The first version sent bare option names (`"criteria": {"fully_compliant": null, ...}`)
-> and a vague question. On the live model every sample came back `invalid_unrelated_doc`, including valid
-> paystubs. Giving each option a one-line definition and naming the required document in the question fixed
-> all four verdicts and lifted valid documents from 0.33-0.59 to 0.91-0.94 confidence, with the 0.88
-> threshold unchanged.
+### 2. Yes/no requirement checks in the same request, and a code rule for dates
 
-### 2. The wiring: a Strands intervention in front of the tool
+```python
+# stipgate/handlers.py (abridged)
+def build_requirement_checks(condition_code, as_of):
+    if condition_code == "STIP_INCOME_30DAY":
+        return {"has_employer_and_ytd": YesNoCheck(
+            question="Does this paystub show the employer's name and the year-to-date (YTD) gross earnings?",
+            true_means="both the employer name and a YTD gross amount are present",
+            false_means="the employer name or the YTD gross amount is missing")}
+    if condition_code == "STIP_W2_2YR":
+        return {"covers_two_tax_years": YesNoCheck(
+            question=f"Does this document include W-2 forms for both tax year {as_of.year - 1} and tax year {as_of.year - 2}?",
+            true_means=f"there is a W-2 for {as_of.year - 1} and a separate W-2 for {as_of.year - 2}",
+            false_means="only one tax year is present, or a year is missing")}
+    return {}
+
+RECENCY_WINDOW_DAYS = {"STIP_INCOME_30DAY": 30, "STIP_ASSET_2MO": 60}   # checked in code, not by the model
+```
+
+Each check is sent as a `noul` question next to the `choice` question, so it costs one Decider call:
+
+```json
+"has_employer_and_ytd": {"type": "noul",
+  "instructions": "Does this paystub show the employer's name and the year-to-date (YTD) gross earnings?",
+  "criteria": {"true": "both the employer name and a YTD gross amount are present",
+               "false": "the employer name or the YTD gross amount is missing"}}
+```
+
+Decision rule: `fully_compliant` with confidence ≥ **0.80**, every check P(yes) ≥ **0.85**, and the date rule
+passes. A missing or malformed check answer fails closed. Thresholds were tuned on a separate seed
+([benchmarks/](benchmarks/README.md#how-the-thresholds-were-chosen)).
+
+> **Lessons learned on the live model.**
+> 1. **Define every option.** v1 sent bare option names (`"criteria": {"fully_compliant": null, ...}`). Every
+>    sample came back `invalid_unrelated_doc`, valid paystubs included. One-sentence definitions fixed all four
+>    verdicts and lifted valid documents from 0.33-0.59 to 0.91-0.94 confidence.
+> 2. **One question can't carry every rule.** With only the document-type question, the gate approved every
+>    stale paystub and every paystub missing fields (38% hallucinated approvals on 100 held-out documents).
+>    Adding yes/no checks for the missing content brought that to 0%.
+> 3. **Don't ask the model to do arithmetic.** Asked "did the pay period end within the last 30 days?",
+>    Decider 2B gave 10-day-old and 90-day-old paystubs the same scores (0.63-0.80 vs 0.51-0.73). A few lines
+>    of code now check the date. Decider judges meaning; code checks numbers.
+
+### 3. The wiring: a Strands intervention in front of the tool
 
 ```python
 from strands import Agent
@@ -167,7 +228,8 @@ decider = DeciderClient("http://127.0.0.1:8099/v1/systemone", timeout_s=1.5, mod
 queue = InMemoryReviewQueue()            # or anything with enqueue(ticket) -> None: SQS, an LOS task API
 handler = StipulationGuardrailHandler(
     decider,
-    confidence_threshold=0.88,           # Proceed only on fully_compliant AND confidence >= 0.88
+    confidence_threshold=0.80,           # document-type choice must be fully_compliant at >= 0.80
+    check_threshold=0.85,                # every yes/no requirement check must reach P(yes) >= 0.85
     review_queue=queue,
     target_tool="clear_underwriting_condition",
 )
@@ -188,12 +250,13 @@ wiring. Without an agent loop: `StipGatePipeline(decider=decider).process_docume
 > The spec this was built from referenced `strands.handlers.InterventionHandler`. That path does not exist in
 > strands-agents 1.61.1; the real API is `strands.interventions`, which StipGate subclasses directly.
 
-### 3. Adapting it to your own agent
+### 4. Adapting it to your own agent
 
 Swap the domain, keep the shape:
 
 ```python
 from stipgate import DeciderClient
+from stipgate.decider_client import YesNoCheck
 
 result = DeciderClient("http://127.0.0.1:8099/v1/systemone").decide_detailed(
     text=user_supplied_document,
@@ -204,15 +267,22 @@ result = DeciderClient("http://127.0.0.1:8099/v1/systemone").decide_detailed(
         "wrong_document": "It is not an itemised hotel receipt; it is another kind of document.",
         "needs_human_review": "It is garbled, cut off or unreadable.",
     },
+    checks={"shows_total_and_dates": YesNoCheck(
+        question="Does the receipt show the total amount and the check-in and check-out dates?",
+        true_means="the total and both dates are present",
+        false_means="the total or a date is missing")},
 )
-if result.verdict == "valid" and result.confidence >= 0.88:
+ok = (result.verdict == "valid" and result.confidence >= 0.80
+      and all(p >= 0.85 for p in (result.checks or {}).values()))
+if ok and stay_dates_within_policy(user_supplied_document):   # numbers and dates: your code
     ...  # call the expensive tool / LLM
 else:
     ...  # halt, ask the user, or route to a person
 ```
 
 Rules that made it work: name the required thing in the question, define every option in one sentence,
-include an explicit "send to a human" option, act only above a threshold, and treat every error as a halt.
+include an explicit "send to a human" option, turn each content rule into its own yes/no check, keep date and
+number arithmetic in code, tune thresholds on data you don't evaluate on, and treat every error as a halt.
 
 ---
 
@@ -312,7 +382,10 @@ The gate halts whenever anything is uncertain. Each row below is covered by a te
 
 - Decider unreachable, timeout, HTTP 4xx/5xx, non-JSON, a verdict outside the options, or a confidence that is
   not a number in [0, 1] → HALTED, verdict `decider_error`, 0 tokens, review ticket.
-- `fully_compliant` below 0.88, or any other verdict → HALTED.
+- `fully_compliant` below 0.80, or any other verdict → HALTED.
+- A requirement check below 0.85 → HALTED (`failed_requirement_check`); a check the server did not answer
+  → HALTED (`decider_error`).
+- Paystub or statement older than its window, future-dated, or with no date found → HALTED (`failed_date_rule`).
 - The heuristic simulator runs only on explicit opt-in and can never clear a condition unless
   `STIPGATE_ALLOW_HEURISTIC_PROCEED=1` (CI / demo only).
 - Bedrock failure after the gate passed → `pending_extraction_review`, never `cleared`; synthetic fields are listed.
@@ -327,20 +400,20 @@ The gate halts whenever anything is uncertain. Each row below is covered by a te
 python benchmark.py --offline --heuristic                  # 4 documents, expects PROCEED/HALTED/PROCEED/HALTED
 python benchmark.py --decider-mode server                  # against a live Decider (+ Nova Lite with AWS creds)
 python benchmark.py --heldout --decider-mode server        # seeded 100-document synthetic held-out set
+python benchmark.py --heldout --llm-judge                  # LLM-only baseline: Nova Lite answers the same rubric
 ```
 
 The held-out set (seed `20261019`) has 45 compliant documents (paystubs, two-year W-2s) and 55 non-compliant
 ones (stale paystubs, single-year W-2s, utility bills, bank statements under an income code, corrupted scans,
 missing fields). It reports cost reduction, hallucinated approvals, false halts, accuracy and gate p50 / p95.
 
-| Run | Backend | Hallucinated approvals | False halts | Accuracy |
-|---|---|---|---|---|
-| `--heldout --offline --heuristic` | heuristic simulator (opted in) | 0% (0/55) | 0% (0/45) | 100% |
-| `--heldout --offline`, no Decider server | none: every document failed closed | 0% (0/55) | 100% (45/45) | 55% |
+Live results, per-category tables, how thresholds were tuned on a separate seed, the raw per-document files
+and the caveats: [benchmarks/README.md](benchmarks/README.md). The set is synthetic and generated by this
+repo; real borrower documents are messier.
 
-These held-out numbers come from the heuristic, which was written alongside the synthetic set, so they are
-optimistic and are **not** Decider 2B results. The live Decider 2B numbers are the table at the top. Pricing
-constants used for cost estimates are named in `benchmark.py`; verify them against current Bedrock pricing.
+Offline (no model), the built-in heuristic simulator scores 100% on the same set. It was written alongside the
+set, so that number is a CI check, not a Decider 2B result. Pricing constants for cost estimates are named in
+`benchmark.py`; verify them against current Bedrock pricing.
 
 ---
 
@@ -349,7 +422,7 @@ constants used for cost estimates are named in `benchmark.py`; verify them again
 ```
 stipgate/
 ├── stipgate/
-│   ├── handlers.py          # StipulationGuardrailHandler, question/criteria builders, review queue
+│   ├── handlers.py          # StipulationGuardrailHandler, question/criteria/check builders, date rule, queue
 │   ├── decider_client.py    # DeciderClient (server | heuristic | auto), wire contracts, HeuristicDecider
 │   ├── bedrock_worker.py    # BedrockExtractor (Nova Lite Converse) + IncomeClearancePayload
 │   ├── ocr.py               # DocumentTextExtractor: .txt / pypdf / Nova Lite OCR for uploads
@@ -357,8 +430,9 @@ stipgate/
 │   ├── api.py               # FastAPI service, auth, metrics, audit log, stipgate-serve
 │   ├── samples.py           # synthetic benchmark / UI documents
 │   └── static/index.html    # accessible single-file test UI
-├── tests/                   # 120 offline tests (pytest), strict mypy
-├── benchmark.py             # 4-document run + 100-document held-out set
+├── tests/                   # 125 offline tests (pytest), strict mypy
+├── benchmark.py             # 4-document run, 100-document held-out set, --llm-judge baseline
+├── benchmarks/              # live results (per-document JSON), tuning scores, method and caveats
 ├── deploy/aws/              # deploy, CloudFront, update, rotate key, smoke test, teardown
 ├── docker/decider/          # CPU Decider sidecar image (PyPI strands-decider)
 ├── docs/                    # ARCHITECTURE, DECIDER_HOSTING, DEPLOYMENT, USAGE

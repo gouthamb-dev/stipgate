@@ -75,6 +75,8 @@ __all__ = [
     "DeciderResponseError",
     "DeciderUnavailableError",
     "DeciderResult",
+    "YesNoCheck",
+    "latest_document_date",
     "HeuristicDecider",
     "DeciderClient",
 ]
@@ -124,6 +126,18 @@ class DeciderResult:
     latency_ms: float
     heuristic_proceed_allowed: bool
     model: str | None = None  # model id reported by the server (e.g. "strands-decider-2B-...@216d1cc")
+    # P(true) per requested yes/no check, answered in the same server call. None when the backend
+    # cannot answer checks (heuristic simulator, simple /decide contract): the caller decides.
+    checks: Mapping[str, float] | None = None
+
+
+@dataclass(frozen=True)
+class YesNoCheck:
+    """A yes/no requirement sent as a systemone ``noul`` question alongside the main choice."""
+
+    question: str
+    true_means: str
+    false_means: str
 
 
 # --------------------------------------------------------------------------------------------
@@ -267,6 +281,12 @@ def parse_date(raw: str) -> date | None:
     except ValueError:
         return None
     return None
+
+
+def latest_document_date(text: str) -> date | None:
+    """Latest pay-period-end / pay / check / statement date found in ``text`` (None if none parse)."""
+    dates = [d for d in (parse_date(m.group(2)) for m in _PERIOD_DATE_RE.finditer(text)) if d is not None]
+    return max(dates) if dates else None
 
 
 class HeuristicDecider:
@@ -539,12 +559,13 @@ class DeciderClient:
         options: list[str],
         *,
         criteria: Mapping[str, str | None] | None = None,
+        checks: Mapping[str, YesNoCheck] | None = None,
     ) -> tuple[str, float]:
         """Return ``(verdict, confidence)`` where ``verdict`` is one of ``options``.
 
         Thin wrapper over :meth:`decide_detailed`; raises the same exceptions.
         """
-        result = self.decide_detailed(text, question, options, criteria=criteria)
+        result = self.decide_detailed(text, question, options, criteria=criteria, checks=checks)
         return result.verdict, result.confidence
 
     def decide_detailed(
@@ -554,12 +575,15 @@ class DeciderClient:
         options: list[str],
         *,
         criteria: Mapping[str, str | None] | None = None,
+        checks: Mapping[str, YesNoCheck] | None = None,
     ) -> DeciderResult:
         """Answer ``question`` about ``text`` and return a per-call :class:`DeciderResult`.
 
         ``criteria`` optionally defines each option in words (sent as the systemone ``criteria`` values;
-        options without an entry are sent as ``null``). The simple ``/decide`` contract and the heuristic
-        simulator ignore it.
+        options without an entry are sent as ``null``). ``checks`` adds yes/no ``noul`` questions to the
+        same systemone request; their P(true) values come back in ``DeciderResult.checks`` and a missing
+        or invalid check answer raises :class:`DeciderResponseError`. The simple ``/decide`` contract and
+        the heuristic simulator ignore both (``checks`` is then ``None``).
 
         Raises:
             ValueError: invalid arguments.
@@ -570,6 +594,7 @@ class DeciderClient:
         self._validate_inputs(text, question, options)
         started = time.perf_counter()
         model: str | None = None
+        check_answers: dict[str, float] | None = None
         try:
             if self.mode == "heuristic" or (self.mode == "auto" and time.monotonic() < self._offline_until):
                 verdict, confidence, rationale = self._run_heuristic(text, question, options)
@@ -577,7 +602,9 @@ class DeciderClient:
             else:
                 try:
                     with self._server_slots:
-                        verdict, confidence, model = self._ask_server(text, question, options, criteria)
+                        verdict, confidence, model, check_answers = self._ask_server(
+                            text, question, options, criteria, checks
+                        )
                     rationale = "decider-2b server"
                     backend = "server"
                 except urllib.error.HTTPError as exc:
@@ -596,6 +623,7 @@ class DeciderClient:
                 latency_ms=(time.perf_counter() - started) * 1000.0,
                 heuristic_proceed_allowed=self.allow_heuristic_proceed,
                 model=model if backend == "server" else None,
+                checks=check_answers if backend == "server" else None,
             )
         finally:
             self.last_latency_ms = (time.perf_counter() - started) * 1000.0
@@ -657,16 +685,17 @@ class DeciderClient:
         question: str,
         options: list[str],
         criteria: Mapping[str, str | None] | None = None,
-    ) -> tuple[str, float, str | None]:
+        checks: Mapping[str, YesNoCheck] | None = None,
+    ) -> tuple[str, float, str | None, dict[str, float] | None]:
         """Call the configured endpoint; on a simple-protocol 404 retry once against /v1/systemone."""
         endpoint = self.endpoint
         try:
-            return self._call_server(endpoint, text, question, options, criteria)
+            return self._call_server(endpoint, text, question, options, criteria, checks)
         except urllib.error.HTTPError as exc:
             if exc.code != 404 or self._protocol_for(endpoint) != "simple":
                 raise
         fallback_url = self._systemone_url(endpoint)
-        answer = self._call_server(fallback_url, text, question, options, criteria)
+        answer = self._call_server(fallback_url, text, question, options, criteria, checks)
         self.endpoint = fallback_url
         return answer
 
@@ -677,21 +706,28 @@ class DeciderClient:
         question: str,
         options: list[str],
         criteria: Mapping[str, str | None] | None = None,
-    ) -> tuple[str, float, str | None]:
+        checks: Mapping[str, YesNoCheck] | None = None,
+    ) -> tuple[str, float, str | None, dict[str, float] | None]:
         protocol = self._protocol_for(url)
         body: dict[str, Any]
         if protocol == "systemone":
             definitions = criteria or {}
-            body = {
-                "state": text,
-                "questions": {
-                    SYSTEMONE_QUESTION_KEY: {
-                        "type": "choice",
-                        "instructions": question,
-                        "criteria": {option: definitions.get(option) for option in options},
-                    }
-                },
+            questions: dict[str, Any] = {
+                SYSTEMONE_QUESTION_KEY: {
+                    "type": "choice",
+                    "instructions": question,
+                    "criteria": {option: definitions.get(option) for option in options},
+                }
             }
+            for name, check in (checks or {}).items():
+                if name == SYSTEMONE_QUESTION_KEY:
+                    raise ValueError(f"check name {name!r} collides with the main question")
+                questions[name] = {
+                    "type": "noul",
+                    "instructions": check.question,
+                    "criteria": {"true": check.true_means, "false": check.false_means},
+                }
+            body = {"state": text, "questions": questions}
         else:
             body = {"text": text, "question": question, "options": list(options)}
         request = urllib.request.Request(
@@ -711,8 +747,26 @@ class DeciderClient:
         reported = payload.get("model")
         model = reported[:200] if isinstance(reported, str) and reported else None
         if protocol == "systemone":
-            return (*self._parse_systemone(payload, options), model)
-        return (*self._parse_simple(payload, options), model)
+            verdict, confidence = self._parse_systemone(payload, options)
+            return verdict, confidence, model, self._parse_checks(payload, checks) if checks else None
+        return (*self._parse_simple(payload, options), model, None)
+
+    @staticmethod
+    def _parse_checks(payload: dict[str, Any], checks: Mapping[str, YesNoCheck]) -> dict[str, float]:
+        answers = payload.get("answers")
+        if not isinstance(answers, dict):
+            raise DeciderResponseError("systemone response missing 'answers'")
+        result: dict[str, float] = {}
+        for name in checks:
+            answer = answers.get(name)
+            value = answer.get("noul") if isinstance(answer, dict) else None
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise DeciderResponseError(f"check {name!r}: P(true) {value!r} is not numeric")
+            probability = float(value)
+            if not math.isfinite(probability) or not 0.0 <= probability <= 1.0:
+                raise DeciderResponseError(f"check {name!r}: P(true) {probability!r} outside [0, 1]")
+            result[name] = probability
+        return result
 
     def _parse_simple(self, payload: dict[str, Any], options: list[str]) -> tuple[str, float]:
         verdict = payload.get("verdict", payload.get("answer"))

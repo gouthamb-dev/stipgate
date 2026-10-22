@@ -29,18 +29,24 @@ import threading
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Final, Literal, Protocol
 
 from strands.hooks import BeforeToolCallEvent
 from strands.interventions import Guide, InterventionHandler, OnError, Proceed
 
-from stipgate.decider_client import DeciderClient
+from stipgate.decider_client import DeciderClient, YesNoCheck, latest_document_date
 
 __all__ = [
     "CLEAR_CONDITION_TOOL",
     "VERDICT_OPTIONS",
     "DEFAULT_CONFIDENCE_THRESHOLD",
+    "DEFAULT_CHECK_THRESHOLD",
+    "RECENCY_WINDOW_DAYS",
+    "DATE_RULE_VERDICT",
+    "CHECK_FAILED_VERDICT",
+    "build_requirement_checks",
+    "date_rule_failure",
     "QUESTION_TEMPLATE",
     "CONDITION_DOCUMENTS",
     "required_document",
@@ -64,7 +70,10 @@ VERDICT_OPTIONS: Final[tuple[str, ...]] = (
     "invalid_unrelated_doc",
     "ambiguous_requires_human_review",
 )
-DEFAULT_CONFIDENCE_THRESHOLD: Final = 0.88
+# Tuned on a separate seed (4242) of the synthetic set against the live int8 Decider: valid documents
+# scored 0.84-0.97 on the document-type question, the worst wrong-type / garbled documents <= 0.46.
+# 0.88 would have halted 8 of 45 valid documents. Requirement checks carry the content rules.
+DEFAULT_CONFIDENCE_THRESHOLD: Final = 0.80
 # What each stipulation requires, in plain words. Decider 2B reads these through the question and the
 # per-option criteria; with bare option names (criteria = null) it labelled every sample
 # invalid_unrelated_doc on the live int8 runtime.
@@ -86,6 +95,54 @@ def required_document(condition_code: str) -> str:
 def build_question(condition_code: str) -> str:
     """Decider question for one stipulation (keeps the STIP_* code for the heuristic simulator)."""
     return QUESTION_TEMPLATE.format(document=required_document(condition_code), condition_code=condition_code)
+
+
+# Yes/no requirement checks asked in the same Decider call. P(true) must reach this bar for every check.
+DEFAULT_CHECK_THRESHOLD: Final = 0.85  # tuning seed: valid >= 0.91, failing documents <= 0.75
+# Date arithmetic is done in code, not by the model: Decider 2B could not separate 10-day-old from
+# 90-day-old paystubs on the live int8 runtime (P(recent) 0.63-0.80 vs 0.51-0.73).
+RECENCY_WINDOW_DAYS: Final[dict[str, int]] = {"STIP_INCOME_30DAY": 30, "STIP_ASSET_2MO": 60}
+_FUTURE_TOLERANCE_DAYS: Final = 3
+DATE_RULE_VERDICT: Final = "failed_date_rule"
+CHECK_FAILED_VERDICT: Final = "failed_requirement_check"
+
+
+def build_requirement_checks(condition_code: str, as_of: date) -> dict[str, YesNoCheck]:
+    """Content requirements Decider 2B verifies as yes/no questions, beyond the document type."""
+    if condition_code == "STIP_INCOME_30DAY":
+        return {
+            "has_employer_and_ytd": YesNoCheck(
+                question="Does this paystub show the employer's name and the year-to-date (YTD) gross earnings?",
+                true_means="both the employer name and a YTD gross amount are present",
+                false_means="the employer name or the YTD gross amount is missing",
+            )
+        }
+    if condition_code == "STIP_W2_2YR":
+        latest, previous = as_of.year - 1, as_of.year - 2
+        return {
+            "covers_two_tax_years": YesNoCheck(
+                question=f"Does this document include W-2 forms for both tax year {latest} and tax year {previous}?",
+                true_means=f"there is a W-2 for {latest} and a separate W-2 for {previous}",
+                false_means="only one tax year is present, or a year is missing",
+            )
+        }
+    return {}
+
+
+def date_rule_failure(condition_code: str, snippet: str, as_of: date) -> str | None:
+    """Deterministic recency rule; returns a reason when the document fails it, else None."""
+    window = RECENCY_WINDOW_DAYS.get(condition_code)
+    if window is None:
+        return None
+    latest = latest_document_date(snippet)
+    if latest is None:
+        return "no pay-period or statement date found"
+    age = (as_of - latest).days
+    if age > window:
+        return f"document date {latest.isoformat()} is {age} days old (limit {window})"
+    if age < -_FUTURE_TOLERANCE_DAYS:
+        return f"document date {latest.isoformat()} is in the future"
+    return None
 
 
 def build_criteria(condition_code: str) -> dict[str, str]:
@@ -170,6 +227,7 @@ class GateDecision:
     backend: str | None = None
     ticket_id: str | None = None
     model: str | None = None  # Decider model id reported by the server, when available
+    checks: Mapping[str, float] | None = None  # P(true) per requirement check, when the backend answered them
 
 
 class StipulationGuardrailHandler(InterventionHandler):
@@ -182,11 +240,18 @@ class StipulationGuardrailHandler(InterventionHandler):
         review_queue: HumanReviewQueue | None = None,
         *,
         target_tool: str = CLEAR_CONDITION_TOOL,
+        check_threshold: float = DEFAULT_CHECK_THRESHOLD,
+        requirement_checks: bool = True,
+        as_of: date | None = None,
     ) -> None:
-        if isinstance(confidence_threshold, bool) or not isinstance(confidence_threshold, (int, float)):
-            raise ValueError("confidence_threshold must be a number")
-        if not math.isfinite(confidence_threshold) or not 0.0 < confidence_threshold <= 1.0:
-            raise ValueError("confidence_threshold must be in (0, 1]")
+        for label, value in (("confidence_threshold", confidence_threshold), ("check_threshold", check_threshold)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{label} must be a number")
+            if not math.isfinite(value) or not 0.0 < value <= 1.0:
+                raise ValueError(f"{label} must be in (0, 1]")
+        self.check_threshold: float = float(check_threshold)
+        self.requirement_checks: bool = requirement_checks
+        self.as_of: date | None = as_of
         if not target_tool:
             raise ValueError("target_tool must be a non-empty tool name")
         self.decider: DeciderClient = decider
@@ -273,9 +338,17 @@ class StipulationGuardrailHandler(InterventionHandler):
                 raise ValueError(f"condition_code {raw_code!r} is not a valid stipulation code")
             condition_code = normalized
 
+            reference = self._reference_date()
+            checks: dict[str, YesNoCheck] = (
+                build_requirement_checks(condition_code, reference) if self.requirement_checks else {}
+            )
+
+            # 1. One Decider call: document-type choice + yes/no requirement checks.
             question = build_question(condition_code)
             options = list(VERDICT_OPTIONS)
-            result = self.decider.decide_detailed(snippet, question, options, criteria=build_criteria(condition_code))
+            result = self.decider.decide_detailed(
+                snippet, question, options, criteria=build_criteria(condition_code), checks=checks or None
+            )
             verdict = result.verdict
             confidence: object = result.confidence
             latency_ms = float(result.latency_ms)
@@ -291,6 +364,48 @@ class StipulationGuardrailHandler(InterventionHandler):
             if not math.isfinite(score) or not 0.0 <= score <= 1.0:
                 raise ValueError(f"Decider confidence {score!r} outside [0, 1]")
 
+            answered = getattr(result, "checks", None)
+            check_scores: dict[str, float] | None = dict(answered) if isinstance(answered, Mapping) else None
+            approved = verdict == "fully_compliant" and score >= self.confidence_threshold
+            if approved and self.requirement_checks:
+                # 2. Deterministic date rule (code does the arithmetic, not the model).
+                failure = date_rule_failure(condition_code, snippet, reference)
+                if failure is not None:
+                    return self._halt(
+                        tool_use_id=tool_use_id,
+                        document_id=document_id,
+                        condition_code=condition_code,
+                        snippet=snippet,
+                        verdict=DATE_RULE_VERDICT,
+                        confidence=score,
+                        latency_ms=latency_ms,
+                        backend=backend,
+                        reason=f"date rule: {failure}",
+                        model=model,
+                        checks=check_scores,
+                    )
+            if approved and check_scores:
+                # 3. Every requirement must also pass. (Backends that cannot answer checks return None;
+                # the heuristic encodes these requirements itself.)
+                failed = {n: p for n, p in check_scores.items() if p < self.check_threshold}
+                missing = [n for n in checks if n not in check_scores]
+                if failed or missing:
+                    detail = ", ".join(f"{n} P(true)={p:.2f}" for n, p in failed.items())
+                    if missing:
+                        detail = ", ".join(filter(None, [detail, f"unanswered: {', '.join(missing)}"]))
+                    return self._halt(
+                        tool_use_id=tool_use_id,
+                        document_id=document_id,
+                        condition_code=condition_code,
+                        snippet=snippet,
+                        verdict=CHECK_FAILED_VERDICT,
+                        confidence=score,
+                        latency_ms=latency_ms,
+                        backend=backend,
+                        reason=f"requirement check below {self.check_threshold:.2f}: {detail}",
+                        model=model,
+                        checks=check_scores,
+                    )
             if verdict == "fully_compliant" and score >= self.confidence_threshold:
                 if result.backend == "heuristic" and not result.heuristic_proceed_allowed:
                     return self._halt(
@@ -320,6 +435,7 @@ class StipulationGuardrailHandler(InterventionHandler):
                     reason=reason,
                     backend=backend,
                     model=model,
+                    checks=check_scores,
                 )
                 self._record(decision)
                 logger.info("PROCEED %s doc=%s %s", self.target_tool, document_id, reason)
@@ -341,6 +457,7 @@ class StipulationGuardrailHandler(InterventionHandler):
                     else f"verdict={verdict}"
                 ),
                 model=model,
+                checks=check_scores,
             )
         except Exception as exc:
             return self._halt(
@@ -356,6 +473,13 @@ class StipulationGuardrailHandler(InterventionHandler):
             )
 
     # -- internals ----------------------------------------------------------------------------
+
+    def _reference_date(self) -> date:
+        """``as_of`` if set, else the Decider client's pinned heuristic date (tests / benchmarks), else today."""
+        if self.as_of is not None:
+            return self.as_of
+        pinned = getattr(self.decider, "heuristic_as_of", None)
+        return pinned if isinstance(pinned, date) else date.today()
 
     def _record(self, decision: GateDecision) -> None:
         with self._lock:
@@ -375,6 +499,7 @@ class StipulationGuardrailHandler(InterventionHandler):
         backend: str | None,
         reason: str,
         model: str | None = None,
+        checks: Mapping[str, float] | None = None,
     ) -> tuple[Guide, GateDecision]:
         ticket = ReviewTicket(
             ticket_id=uuid.uuid4().hex,
@@ -404,6 +529,7 @@ class StipulationGuardrailHandler(InterventionHandler):
             backend=backend,
             ticket_id=ticket.ticket_id,
             model=model,
+            checks=checks,
         )
         self._record(decision)
         logger.info(

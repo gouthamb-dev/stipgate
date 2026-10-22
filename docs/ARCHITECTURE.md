@@ -12,7 +12,7 @@ Related docs: [DECIDER_HOSTING.md](DECIDER_HOSTING.md) (running the model), [DEP
 | Component | Module | Role |
 |---|---|---|
 | Strands Agent | `stipgate.pipeline.build_agent` | Agent loop (Nova Lite via `BedrockModel`) with the clearance tool and the gate registered as an intervention. |
-| `StipulationGuardrailHandler` | `stipgate/handlers.py` | `strands.interventions.InterventionHandler` subclass. Intercepts `before_tool_call` for `clear_underwriting_condition`, asks Decider 2B one typed question with three typed options, returns `Proceed` or `Guide`. `on_error="deny"`. |
+| `StipulationGuardrailHandler` | `stipgate/handlers.py` | `strands.interventions.InterventionHandler` subclass. Intercepts `before_tool_call` for `clear_underwriting_condition`. One Decider 2B request carries the document-type `choice` (three typed options) plus per-condition yes/no `noul` requirement checks; then a code date rule. Returns `Proceed` only if all pass, else `Guide`. `on_error="deny"`. |
 | `DeciderClient` | `stipgate/decider_client.py` | stdlib `urllib.request` client. Modes: `server` (default, fails closed on outage), `heuristic` (offline simulator only), `auto` (server first, heuristic on outage, 30 s breaker). Heuristic verdicts never clear a condition unless `allow_heuristic_proceed=True`. Speaks `/decide` and the official `/v1/systemone` contract (404 retry). Bounded in-flight requests (`max_concurrency`, default 1). |
 | Decider 2B sidecar | `strands-decider serve ...` | Local model server on loopback port 8099 (`POST /v1/systemone`, `GET /health`). Unauthenticated upstream; never exposed. See [DECIDER_HOSTING.md](DECIDER_HOSTING.md). |
 | `BedrockExtractor` | `stipgate/bedrock_worker.py` | Nova Lite (`amazon.nova-lite-v1:0`, us-east-1) Converse extraction into the Pydantic v2 `IncomeClearancePayload`. On any AWS / parse failure it returns a regex/synthetic fallback marked `is_fallback`, which never clears. |
@@ -43,7 +43,7 @@ sequenceDiagram
     API->>H: evaluate_with_decision(clear_underwriting_condition, input)
     H->>D: POST /v1/systemone (typed question + 3 options, each with a definition)
     D-->>H: choice + confidence (or error / timeout)
-    alt fully_compliant AND confidence >= 0.88 (and not an unauthorised heuristic verdict)
+    alt fully_compliant >= 0.80 AND every check >= 0.85 AND date rule passes (and not an unauthorised heuristic verdict)
         H-->>API: Proceed + GateDecision
         API->>B: Converse (system prompt + condition code + snippet)
         alt valid IncomeClearancePayload
@@ -73,7 +73,7 @@ LOS/UI ──POST /v1/documents/evaluate──► StipGate API ──422 on inva
                               Decider 2B @ 127.0.0.1:8099/v1/systemone
                                             │
             ┌───────────────────────────────┴──────────────────────────────┐
-            │ fully_compliant & conf >= 0.88                               │ anything else / error / timeout
+            │ fully_compliant >= 0.80, checks >= 0.85, date rule ok        │ anything else / error / timeout
             │ (heuristic only if allow_heuristic_proceed)                  │
             ▼                                                              ▼
    Nova Lite Converse (us-east-1)                                 Guide(feedback) ─► ReviewTicket
@@ -137,7 +137,10 @@ LOS/UI ──POST /v1/documents/evaluate──► StipGate API ──422 on inva
 | Non-JSON response | `DeciderResponseError` -> `Guide` | 0 | yes | `tests/test_stipgate.py::test_decider_non_json_raises`, `::test_server_string_confidence_fails_closed` (same exception path in the handler) |
 | Verdict outside the three options | `DeciderResponseError` / handler validation -> `Guide` | 0 | yes | `tests/test_stipgate.py::test_decider_invalid_server_verdict_raises`, `::test_out_of_options_verdict_fails_closed` |
 | Confidence string (`"0.93"`), NaN, bool, null, outside [0, 1] | `DeciderResponseError` -> `Guide` | 0 | yes | `tests/test_stipgate.py::test_decider_invalid_confidence_raises`, `::test_server_string_confidence_fails_closed`, `::test_out_of_options_verdict_fails_closed` |
-| `fully_compliant` with confidence < 0.88 | `Guide` (0.88 exactly proceeds) | 0 | yes | `tests/test_stipgate.py::test_threshold_087_returns_guide`, `::test_threshold_089_returns_proceed`, `::test_threshold_exactly_088_returns_proceed` |
+| Requirement check (yes/no `noul`) below `check_threshold` (default 0.85) | `Guide`, verdict `failed_requirement_check` | 0 | yes | `tests/test_stipgate.py::test_failed_requirement_check_halts`, `::test_requirement_checks_sent_in_same_request` |
+| Requirement check missing from the server answer | `DeciderResponseError` -> `Guide`, verdict `decider_error` | 0 | yes | `tests/test_stipgate.py::test_missing_check_answer_fails_closed` |
+| Decider approves but the paystub / statement is outside its window, future-dated or undated | `Guide`, verdict `failed_date_rule` (code, not the model) | 0 | yes | `tests/test_stipgate.py::test_stale_paystub_halted_by_date_rule_after_decider_approves`, `::test_unrelated_verdict_kept_when_date_missing` |
+| `fully_compliant` below `confidence_threshold` (default 0.80; tests pin 0.88) | `Guide` (the threshold exactly proceeds) | 0 | yes | `tests/test_stipgate.py::test_threshold_087_returns_guide`, `::test_threshold_089_returns_proceed`, `::test_threshold_exactly_088_returns_proceed` |
 | `invalid_unrelated_doc` / `ambiguous_requires_human_review` | `Guide` | 0 | yes | `tests/test_stipgate.py::test_non_compliant_verdict_high_confidence_guides`, `::test_utility_bill_returns_guide_via_heuristic`, `::test_corrupted_scan_returns_guide_via_heuristic` |
 | Heuristic `fully_compliant` without `allow_heuristic_proceed` | `Guide`, reason "not authorised" | 0 | yes | `tests/test_stipgate.py::test_heuristic_compliant_without_opt_in_guides` |
 | Heuristic with opt-in (CI / demo only) | `Proceed` (API sets `heuristic_warning: true`) | extraction tokens | only if extraction falls back | `tests/test_stipgate.py::test_heuristic_with_opt_in_proceeds`, `::test_core_benchmark_actions`, `tests/test_api.py::test_samples_evaluate_end_to_end` |

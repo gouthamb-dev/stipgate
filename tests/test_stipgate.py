@@ -25,6 +25,7 @@ from strands.interventions import Guide, Proceed
 from benchmark import (
     build_core_documents,
     build_heldout_documents,
+    paystub_text,
     run_core_benchmark,
     run_heldout,
     w2_text,
@@ -45,8 +46,8 @@ from stipgate import (
     StipulationGuardrailHandler,
     build_agent,
 )
-from stipgate.decider_client import DeciderMode, DeciderResult, DeciderUnavailableError
-from stipgate.handlers import build_question
+from stipgate.decider_client import DeciderMode, DeciderResult, DeciderUnavailableError, YesNoCheck
+from stipgate.handlers import DEFAULT_CONFIDENCE_THRESHOLD, build_question
 
 AS_OF = date(2026, 6, 15)
 OPTIONS = list(VERDICT_OPTIONS)
@@ -94,7 +95,7 @@ class FakeDecider(DeciderClient):
     """Returns a fixed server verdict and records calls."""
 
     def __init__(self, verdict: str = "fully_compliant", confidence: float = 0.95) -> None:
-        super().__init__("http://127.0.0.1:8099/decide")
+        super().__init__("http://127.0.0.1:8099/decide", heuristic_as_of=AS_OF)
         self.verdict = verdict
         self.confidence = confidence
         self.calls: list[tuple[str, str, list[str]]] = []
@@ -107,6 +108,7 @@ class FakeDecider(DeciderClient):
         options: list[str],
         *,
         criteria: Mapping[str, str | None] | None = None,
+        checks: Mapping[str, YesNoCheck] | None = None,
     ) -> DeciderResult:
         self.calls.append((text, question, options))
         self.criteria.append(criteria)
@@ -286,7 +288,10 @@ def test_decider_reports_server_model_and_pipeline_trace(monkeypatch: pytest.Mon
     """The server's model id flows DeciderResult -> GateDecision -> trace; heuristic reports none."""
     response = {
         "model": "strands-decider-2B-qwen3.5-v1-2610@216d1cc",
-        "answers": {"stipulation_verdict": {"type": "choice", "choice": "invalid_unrelated_doc", "confidence": 0.95}},
+        "answers": {
+            "stipulation_verdict": {"type": "choice", "choice": "invalid_unrelated_doc", "confidence": 0.95},
+            "has_employer_and_ytd": {"type": "noul", "noul": 0.2},
+        },
     }
     install(monkeypatch, [json.dumps(response).encode()])
     pipeline = StipGatePipeline(
@@ -959,7 +964,7 @@ class MappingDecider(DeciderClient):
     """Maps each snippet to a fixed server verdict, sleeping randomly to force thread interleaving."""
 
     def __init__(self, mapping: dict[str, tuple[str, float]]) -> None:
-        super().__init__("http://127.0.0.1:8099/decide")
+        super().__init__("http://127.0.0.1:8099/decide", heuristic_as_of=AS_OF)
         self.mapping = mapping
 
     def decide_detailed(
@@ -969,6 +974,7 @@ class MappingDecider(DeciderClient):
         options: list[str],
         *,
         criteria: Mapping[str, str | None] | None = None,
+        checks: Mapping[str, YesNoCheck] | None = None,
     ) -> DeciderResult:
         verdict, confidence = self.mapping[text]
         time.sleep(random.uniform(0, 0.003))
@@ -979,7 +985,7 @@ def test_pipeline_concurrent_traces_match_documents() -> None:
     expected = {
         "SG-001": ("fully_compliant", 0.95),
         "SG-002": ("invalid_unrelated_doc", 0.97),
-        "SG-003": ("fully_compliant", 0.87),
+        "SG-003": ("fully_compliant", 0.75),
         "SG-004": ("ambiguous_requires_human_review", 0.93),
     }
     decider = MappingDecider({CORE[doc_id].snippet: answer for doc_id, answer in expected.items()})
@@ -1002,7 +1008,7 @@ def test_pipeline_concurrent_traces_match_documents() -> None:
         assert trace["document_id"] == job_id
         assert trace["verdict"] == verdict
         assert trace["confidence"] == confidence
-        should_proceed = verdict == "fully_compliant" and confidence >= 0.88
+        should_proceed = verdict == "fully_compliant" and confidence >= DEFAULT_CONFIDENCE_THRESHOLD
         assert trace["gated_action"] == ("PROCEED" if should_proceed else "HALTED")
         if should_proceed:
             assert trace["extracted_payload"] is not None
@@ -1117,3 +1123,63 @@ def test_no_network_fixture_blocks_urlopen() -> None:
     blocked: Callable[..., Any] = urllib.request.urlopen
     with pytest.raises(urllib.error.URLError):
         blocked("http://127.0.0.1:8099/decide", timeout=0.01)
+
+
+# --------------------------------------------------------------------------------------------
+# Requirement checks (Decider noul questions) and the deterministic date rule
+# --------------------------------------------------------------------------------------------
+
+
+def _server_answer(choice: str, confidence: float, **checks: float) -> bytes:
+    answers: dict[str, Any] = {"stipulation_verdict": {"type": "choice", "choice": choice, "confidence": confidence}}
+    answers.update({name: {"type": "noul", "noul": p} for name, p in checks.items()})
+    return json.dumps({"answers": answers}).encode()
+
+
+def _server_handler() -> tuple[StipulationGuardrailHandler, InMemoryReviewQueue]:
+    return make_handler(DeciderClient("http://127.0.0.1:8080/invocations", heuristic_as_of=AS_OF))
+
+
+def test_requirement_checks_sent_in_same_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    rec = install(monkeypatch, [_server_answer("fully_compliant", 0.95, covers_two_tax_years=0.97)])
+    handler, _ = _server_handler()
+    w2 = CORE["SG-003"].snippet
+    assert isinstance(handler.evaluate(CLEAR_CONDITION_TOOL, tool_input(w2, "STIP_W2_2YR")), Proceed)
+    questions = rec.body()["questions"]
+    assert questions["covers_two_tax_years"]["type"] == "noul"
+    assert f"tax year {AS_OF.year - 1}" in questions["covers_two_tax_years"]["instructions"]
+    assert handler.last_decision is not None and handler.last_decision.checks == {"covers_two_tax_years": 0.97}
+
+
+def test_failed_requirement_check_halts(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(monkeypatch, [_server_answer("fully_compliant", 0.95, covers_two_tax_years=0.30)])
+    handler, queue = _server_handler()
+    action = handler.evaluate(CLEAR_CONDITION_TOOL, tool_input(CORE["SG-003"].snippet, "STIP_W2_2YR"))
+    assert isinstance(action, Guide)
+    assert handler.last_decision is not None and handler.last_decision.verdict == "failed_requirement_check"
+    assert len(queue) == 1
+
+
+def test_missing_check_answer_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(monkeypatch, [_server_answer("fully_compliant", 0.95)])
+    handler, _ = _server_handler()
+    action = handler.evaluate(CLEAR_CONDITION_TOOL, tool_input(CORE["SG-003"].snippet, "STIP_W2_2YR"))
+    assert isinstance(action, Guide)
+    assert handler.last_decision is not None and handler.last_decision.verdict == "decider_error"
+
+
+def test_stale_paystub_halted_by_date_rule_after_decider_approves(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(monkeypatch, [_server_answer("fully_compliant", 0.97, has_employer_and_ytd=0.95)])
+    handler, _ = _server_handler()
+    stale = paystub_text("Maria L. Chen", "Cascade Freight Logistics LLC", AS_OF - timedelta(days=90), 30.0)
+    action = handler.evaluate(CLEAR_CONDITION_TOOL, tool_input(stale))
+    assert isinstance(action, Guide)
+    decision = handler.last_decision
+    assert decision is not None and decision.verdict == "failed_date_rule" and "days old" in decision.reason
+
+
+def test_unrelated_verdict_kept_when_date_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(monkeypatch, [_server_answer("invalid_unrelated_doc", 0.92, has_employer_and_ytd=0.05)])
+    handler, _ = _server_handler()
+    handler.evaluate(CLEAR_CONDITION_TOOL, tool_input(UTILITY))
+    assert handler.last_decision is not None and handler.last_decision.verdict == "invalid_unrelated_doc"

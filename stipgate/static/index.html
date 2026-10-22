@@ -399,6 +399,12 @@
     addRow(list, "Gated action", actionBadge(t.gated_action));
     addRow(list, "Verdict", t.verdict);
     addRow(list, "Confidence", fixed(t.confidence, 3));
+    if (t.requirement_checks && typeof t.requirement_checks === "object") {
+      var checks = Object.keys(t.requirement_checks).map(function (name) {
+        return name + " P(yes)=" + fixed(t.requirement_checks[name], 2);
+      });
+      addRow(list, "Requirement checks (Decider 2B yes/no)", checks.length ? checks.join("; ") : "None");
+    }
     addRow(list, "Decider 2B model", t.decider_model ? t.decider_model :
       (t.decider_backend === "heuristic" ? "heuristic simulator (NOT the model)" : "not reported"));
     addRow(list, "Decider source", t.decider_backend === "server" ? "live Decider 2B model server" :

@@ -60,7 +60,8 @@ The StipGate API container itself can run on any architecture.
   under concurrent requests is not verified (issue #9), so StipGate serialises calls by default
   (`STIPGATE_DECIDER_MAX_CONCURRENCY=1`).
 - Confidence: top probability rescaled so an even split = 0 and certain = 1. Upstream's convention is to
-  act without a check at >= 0.9; StipGate's default threshold is 0.88.
+  act without a check at >= 0.9. StipGate's defaults (0.80 for the document-type choice, 0.85 for each yes/no
+requirement check) were tuned on the live int8 runtime; see [benchmarks/](../benchmarks/README.md).
 
 ### Serve flags (verified-from-docs)
 

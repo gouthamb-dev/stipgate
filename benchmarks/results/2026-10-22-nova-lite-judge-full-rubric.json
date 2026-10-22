@@ -1,0 +1,1065 @@
+{
+  "judge": "amazon.nova-lite-v1:0",
+  "documents": 100,
+  "accuracy_pct": 69.0,
+  "hallucinated_approval_rate_pct": 56.36,
+  "false_halt_rate_pct": 0.0,
+  "decision_input_tokens": 44570,
+  "decision_output_tokens": 1352,
+  "decision_cost_usd": 0.002999,
+  "p50_latency_ms": 351.6,
+  "p95_latency_ms": 459.0,
+  "errors": 0,
+  "per_category": {
+    "valid_w2": {
+      "total": 20,
+      "PROCEED": 20,
+      "HALTED": 0,
+      "correct": 20
+    },
+    "missing_fields_paystub": {
+      "total": 8,
+      "PROCEED": 8,
+      "HALTED": 0,
+      "correct": 0
+    },
+    "stale_paystub": {
+      "total": 12,
+      "PROCEED": 12,
+      "HALTED": 0,
+      "correct": 0
+    },
+    "corrupted_ocr": {
+      "total": 12,
+      "PROCEED": 11,
+      "HALTED": 1,
+      "correct": 1
+    },
+    "utility_bill": {
+      "total": 10,
+      "PROCEED": 0,
+      "HALTED": 10,
+      "correct": 10
+    },
+    "valid_paystub": {
+      "total": 25,
+      "PROCEED": 25,
+      "HALTED": 0,
+      "correct": 25
+    },
+    "single_year_w2": {
+      "total": 8,
+      "PROCEED": 0,
+      "HALTED": 8,
+      "correct": 8
+    },
+    "bank_statement_under_income_code": {
+      "total": 5,
+      "PROCEED": 0,
+      "HALTED": 5,
+      "correct": 5
+    }
+  },
+  "rows": [
+    {
+      "document_id": "HO-001",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 554,
+      "output_tokens": 10,
+      "latency_ms": 2123.1536000268534
+    },
+    {
+      "document_id": "HO-002",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 406,
+      "output_tokens": 10,
+      "latency_ms": 340.3515999671072
+    },
+    {
+      "document_id": "HO-003",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 17,
+      "latency_ms": 383.1255999393761
+    },
+    {
+      "document_id": "HO-004",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 322.73160002660006
+    },
+    {
+      "document_id": "HO-005",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 382,
+      "output_tokens": 17,
+      "latency_ms": 366.8317999690771
+    },
+    {
+      "document_id": "HO-006",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 17,
+      "latency_ms": 1615.3539000079036
+    },
+    {
+      "document_id": "HO-007",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 566,
+      "output_tokens": 17,
+      "latency_ms": 415.46479996759444
+    },
+    {
+      "document_id": "HO-008",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 407.50189998652786
+    },
+    {
+      "document_id": "HO-009",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 417,
+      "output_tokens": 13,
+      "latency_ms": 461.7561000632122
+    },
+    {
+      "document_id": "HO-010",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 406,
+      "output_tokens": 10,
+      "latency_ms": 340.08039999753237
+    },
+    {
+      "document_id": "HO-011",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 400.9049000451341
+    },
+    {
+      "document_id": "HO-012",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 400.3636999987066
+    },
+    {
+      "document_id": "HO-013",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 458.80729996133596
+    },
+    {
+      "document_id": "HO-014",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 416,
+      "output_tokens": 13,
+      "latency_ms": 388.02319997921586
+    },
+    {
+      "document_id": "HO-015",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 290.32470006495714
+    },
+    {
+      "document_id": "HO-016",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 319.22260008286685
+    },
+    {
+      "document_id": "HO-017",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 373.4041000716388
+    },
+    {
+      "document_id": "HO-018",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 17,
+      "latency_ms": 334.9836999550462
+    },
+    {
+      "document_id": "HO-019",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 373.2367999618873
+    },
+    {
+      "document_id": "HO-020",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 421,
+      "output_tokens": 10,
+      "latency_ms": 355.38969992194325
+    },
+    {
+      "document_id": "HO-021",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 413,
+      "output_tokens": 13,
+      "latency_ms": 342.9376999847591
+    },
+    {
+      "document_id": "HO-022",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 408,
+      "output_tokens": 10,
+      "latency_ms": 361.0723000019789
+    },
+    {
+      "document_id": "HO-023",
+      "category": "bank_statement_under_income_code",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 382,
+      "output_tokens": 13,
+      "latency_ms": 350.70720000658184
+    },
+    {
+      "document_id": "HO-024",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 17,
+      "latency_ms": 303.3674000762403
+    },
+    {
+      "document_id": "HO-025",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 415,
+      "output_tokens": 13,
+      "latency_ms": 329.64829995762557
+    },
+    {
+      "document_id": "HO-026",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 440.51890005357563
+    },
+    {
+      "document_id": "HO-027",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 401,
+      "output_tokens": 20,
+      "latency_ms": 319.1533999051899
+    },
+    {
+      "document_id": "HO-028",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 384,
+      "output_tokens": 17,
+      "latency_ms": 337.5649000518024
+    },
+    {
+      "document_id": "HO-029",
+      "category": "bank_statement_under_income_code",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 382,
+      "output_tokens": 13,
+      "latency_ms": 288.9474000548944
+    },
+    {
+      "document_id": "HO-030",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 406,
+      "output_tokens": 10,
+      "latency_ms": 360.0565999513492
+    },
+    {
+      "document_id": "HO-031",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 556,
+      "output_tokens": 17,
+      "latency_ms": 370.3793999738991
+    },
+    {
+      "document_id": "HO-032",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 415,
+      "output_tokens": 13,
+      "latency_ms": 318.23879992589355
+    },
+    {
+      "document_id": "HO-033",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 321.4323000283912
+    },
+    {
+      "document_id": "HO-034",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 405.4063999792561
+    },
+    {
+      "document_id": "HO-035",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 325.2004999667406
+    },
+    {
+      "document_id": "HO-036",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 375.6976999575272
+    },
+    {
+      "document_id": "HO-037",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 412,
+      "output_tokens": 20,
+      "latency_ms": 357.88950009737164
+    },
+    {
+      "document_id": "HO-038",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 566,
+      "output_tokens": 17,
+      "latency_ms": 352.58369997609407
+    },
+    {
+      "document_id": "HO-039",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 414,
+      "output_tokens": 13,
+      "latency_ms": 364.269100013189
+    },
+    {
+      "document_id": "HO-040",
+      "category": "bank_statement_under_income_code",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 380,
+      "output_tokens": 13,
+      "latency_ms": 397.02869998291135
+    },
+    {
+      "document_id": "HO-041",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 415,
+      "output_tokens": 13,
+      "latency_ms": 410.9170000301674
+    },
+    {
+      "document_id": "HO-042",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 564,
+      "output_tokens": 17,
+      "latency_ms": 423.0987000046298
+    },
+    {
+      "document_id": "HO-043",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 416.6354000335559
+    },
+    {
+      "document_id": "HO-044",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 375.0385999446735
+    },
+    {
+      "document_id": "HO-045",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 558,
+      "output_tokens": 17,
+      "latency_ms": 314.86889999359846
+    },
+    {
+      "document_id": "HO-046",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 381.2261000275612
+    },
+    {
+      "document_id": "HO-047",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 304.679200053215
+    },
+    {
+      "document_id": "HO-048",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 17,
+      "latency_ms": 323.46840004902333
+    },
+    {
+      "document_id": "HO-049",
+      "category": "bank_statement_under_income_code",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 383,
+      "output_tokens": 13,
+      "latency_ms": 398.49169994704425
+    },
+    {
+      "document_id": "HO-050",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 440,
+      "output_tokens": 10,
+      "latency_ms": 367.5072999903932
+    },
+    {
+      "document_id": "HO-051",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 397,
+      "output_tokens": 17,
+      "latency_ms": 324.18789993971586
+    },
+    {
+      "document_id": "HO-052",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 419,
+      "output_tokens": 17,
+      "latency_ms": 382.0856000529602
+    },
+    {
+      "document_id": "HO-053",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 376,
+      "output_tokens": 17,
+      "latency_ms": 337.2502999845892
+    },
+    {
+      "document_id": "HO-054",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 562,
+      "output_tokens": 10,
+      "latency_ms": 304.2571999831125
+    },
+    {
+      "document_id": "HO-055",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 564,
+      "output_tokens": 17,
+      "latency_ms": 391.99900010135025
+    },
+    {
+      "document_id": "HO-056",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 406,
+      "output_tokens": 10,
+      "latency_ms": 366.89080006908625
+    },
+    {
+      "document_id": "HO-057",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 17,
+      "latency_ms": 310.5052999453619
+    },
+    {
+      "document_id": "HO-058",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 307.7586001018062
+    },
+    {
+      "document_id": "HO-059",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 311.3543000072241
+    },
+    {
+      "document_id": "HO-060",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 412,
+      "output_tokens": 20,
+      "latency_ms": 334.2834000941366
+    },
+    {
+      "document_id": "HO-061",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 407,
+      "output_tokens": 17,
+      "latency_ms": 365.91649998445064
+    },
+    {
+      "document_id": "HO-062",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 407,
+      "output_tokens": 17,
+      "latency_ms": 300.97310000564903
+    },
+    {
+      "document_id": "HO-063",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 17,
+      "latency_ms": 321.40110002364963
+    },
+    {
+      "document_id": "HO-064",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 361.7373000597581
+    },
+    {
+      "document_id": "HO-065",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 556,
+      "output_tokens": 17,
+      "latency_ms": 293.635799898766
+    },
+    {
+      "document_id": "HO-066",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 325.6159999873489
+    },
+    {
+      "document_id": "HO-067",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 414,
+      "output_tokens": 13,
+      "latency_ms": 296.5842999983579
+    },
+    {
+      "document_id": "HO-068",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 442.9373999591917
+    },
+    {
+      "document_id": "HO-069",
+      "category": "bank_statement_under_income_code",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 382,
+      "output_tokens": 13,
+      "latency_ms": 307.7354999259114
+    },
+    {
+      "document_id": "HO-070",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 305.2316999528557
+    },
+    {
+      "document_id": "HO-071",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 416,
+      "output_tokens": 13,
+      "latency_ms": 352.40109998267144
+    },
+    {
+      "document_id": "HO-072",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 416,
+      "output_tokens": 13,
+      "latency_ms": 330.77740005683154
+    },
+    {
+      "document_id": "HO-073",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 417,
+      "output_tokens": 20,
+      "latency_ms": 347.4569999380037
+    },
+    {
+      "document_id": "HO-074",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 566,
+      "output_tokens": 10,
+      "latency_ms": 417.770600062795
+    },
+    {
+      "document_id": "HO-075",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 402,
+      "output_tokens": 10,
+      "latency_ms": 326.364399981685
+    },
+    {
+      "document_id": "HO-076",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 333.25190003961325
+    },
+    {
+      "document_id": "HO-077",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 413,
+      "output_tokens": 13,
+      "latency_ms": 348.6744000110775
+    },
+    {
+      "document_id": "HO-078",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 406,
+      "output_tokens": 17,
+      "latency_ms": 336.20919997338206
+    },
+    {
+      "document_id": "HO-079",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 412,
+      "output_tokens": 20,
+      "latency_ms": 358.4056000690907
+    },
+    {
+      "document_id": "HO-080",
+      "category": "stale_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 17,
+      "latency_ms": 383.83609999436885
+    },
+    {
+      "document_id": "HO-081",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 321.1066999938339
+    },
+    {
+      "document_id": "HO-082",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 299.0119999740273
+    },
+    {
+      "document_id": "HO-083",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 499.14369999896735
+    },
+    {
+      "document_id": "HO-084",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 309.36519999522716
+    },
+    {
+      "document_id": "HO-085",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 564,
+      "output_tokens": 10,
+      "latency_ms": 337.46480010449886
+    },
+    {
+      "document_id": "HO-086",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 443.8746999949217
+    },
+    {
+      "document_id": "HO-087",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 415,
+      "output_tokens": 13,
+      "latency_ms": 329.11749999038875
+    },
+    {
+      "document_id": "HO-088",
+      "category": "utility_bill",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 415,
+      "output_tokens": 13,
+      "latency_ms": 353.73259999323636
+    },
+    {
+      "document_id": "HO-089",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 555,
+      "output_tokens": 17,
+      "latency_ms": 453.26310000382364
+    },
+    {
+      "document_id": "HO-090",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 317.57440010551363
+    },
+    {
+      "document_id": "HO-091",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 429,
+      "output_tokens": 10,
+      "latency_ms": 356.15600005257875
+    },
+    {
+      "document_id": "HO-092",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 566,
+      "output_tokens": 17,
+      "latency_ms": 358.2300000125542
+    },
+    {
+      "document_id": "HO-093",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 415,
+      "output_tokens": 17,
+      "latency_ms": 337.27740007452667
+    },
+    {
+      "document_id": "HO-094",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 428,
+      "output_tokens": 10,
+      "latency_ms": 330.1869999850169
+    },
+    {
+      "document_id": "HO-095",
+      "category": "missing_fields_paystub",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 408,
+      "output_tokens": 10,
+      "latency_ms": 469.7738999966532
+    },
+    {
+      "document_id": "HO-096",
+      "category": "single_year_w2",
+      "expected_action": "HALTED",
+      "verdict": "invalid_unrelated_doc",
+      "gated_action": "HALTED",
+      "input_tokens": 418,
+      "output_tokens": 20,
+      "latency_ms": 296.70149995945394
+    },
+    {
+      "document_id": "HO-097",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 561,
+      "output_tokens": 17,
+      "latency_ms": 387.3365999897942
+    },
+    {
+      "document_id": "HO-098",
+      "category": "corrupted_ocr",
+      "expected_action": "HALTED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 401,
+      "output_tokens": 17,
+      "latency_ms": 292.73619991727173
+    },
+    {
+      "document_id": "HO-099",
+      "category": "valid_w2",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 559,
+      "output_tokens": 17,
+      "latency_ms": 373.9641000283882
+    },
+    {
+      "document_id": "HO-100",
+      "category": "valid_paystub",
+      "expected_action": "PROCEED",
+      "verdict": "fully_compliant",
+      "gated_action": "PROCEED",
+      "input_tokens": 430,
+      "output_tokens": 10,
+      "latency_ms": 284.8396999761462
+    }
+  ]
+}

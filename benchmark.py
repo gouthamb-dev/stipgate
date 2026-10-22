@@ -15,6 +15,7 @@ import json
 import math
 import random
 import statistics
+import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
@@ -24,9 +25,16 @@ from typing import Any, Final
 from rich.console import Console
 from rich.table import Table
 
-from stipgate.bedrock_worker import BedrockExtractor
+from stipgate.bedrock_worker import BEDROCK_REGION, NOVA_LITE_MODEL_ID, BedrockExtractor
 from stipgate.decider_client import DeciderClient, DeciderError, DeciderMode
-from stipgate.handlers import DEFAULT_CONFIDENCE_THRESHOLD, VERDICT_OPTIONS, build_criteria, build_question
+from stipgate.handlers import (
+    DEFAULT_CONFIDENCE_THRESHOLD,
+    RECENCY_WINDOW_DAYS,
+    VERDICT_OPTIONS,
+    build_criteria,
+    build_question,
+    build_requirement_checks,
+)
 from stipgate.pipeline import StipGatePipeline
 
 # Sample builders live in stipgate.samples (shared with the web API); they are re-exported here so
@@ -410,6 +418,133 @@ def run_heldout(
     )
 
 
+# --- LLM-only judge baseline (Nova Lite answers the same typed question) ---------------------
+
+LLM_JUDGE_SYSTEM: Final = (
+    "You are a mortgage trailing-document checker. Read the question, the options with their definitions and "
+    "the document. Respond with ONLY one JSON object and nothing else: {\"verdict\": \"<option name>\"}."
+)
+LLM_JUDGE_MAX_TOKENS: Final = 50
+
+
+@dataclass
+class JudgeRow:
+    document_id: str
+    category: str
+    expected_action: str
+    verdict: str
+    gated_action: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: float
+
+
+def _judge_prompt(doc: BenchmarkDoc, as_of: date) -> str:
+    """The full StipGate rubric in words: document type, the date rule and every requirement check."""
+    criteria = build_criteria(doc.condition_code)
+    options = "\n".join(f'- "{name}": {criteria[name]}' for name in VERDICT_OPTIONS)
+    rules: list[str] = []
+    window = RECENCY_WINDOW_DAYS.get(doc.condition_code)
+    if window is not None:
+        rules.append(f"The pay period end or statement date must be within the last {window} days.")
+    rules += [f"{c.question} (required: {c.true_means})" for c in build_requirement_checks(doc.condition_code, as_of).values()]
+    requirements = "\n".join(f"- {rule}" for rule in rules) or "- none"
+    return (
+        f"Today is {as_of.isoformat()}.\n"
+        f"Question: {build_question(doc.condition_code)}\n"
+        f"Answer fully_compliant only if the document type is right AND every requirement below holds; "
+        f"otherwise choose the option that fits best.\n"
+        f"Requirements:\n{requirements}\n"
+        f"Options:\n{options}\n"
+        f"<document>\n{doc.snippet}\n</document>"
+    )
+
+
+def run_llm_judge(
+    docs: list[BenchmarkDoc], client: Any = None, model_id: str = NOVA_LITE_MODEL_ID, as_of: date | None = None
+) -> dict[str, Any]:
+    """Ask Nova Lite the full StipGate rubric per document; PROCEED iff it answers fully_compliant.
+
+    An LLM returns no calibrated confidence, so there is no threshold. Any API or parse error counts as a
+    halt (fail closed), mirroring the gate.
+    """
+    if client is None:
+        import boto3
+
+        client = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+    reference = as_of if as_of is not None else date.today()
+    rows: list[JudgeRow] = []
+    for doc in docs:
+        started = time.perf_counter()
+        verdict = "judge_error"
+        tokens_in = tokens_out = 0
+        try:
+            response = client.converse(
+                modelId=model_id,
+                system=[{"text": LLM_JUDGE_SYSTEM}],
+                messages=[{"role": "user", "content": [{"text": _judge_prompt(doc, reference)}]}],
+                inferenceConfig={"maxTokens": LLM_JUDGE_MAX_TOKENS, "temperature": 0.0},
+            )
+            usage = response.get("usage") or {}
+            tokens_in, tokens_out = int(usage.get("inputTokens", 0)), int(usage.get("outputTokens", 0))
+            text = "".join(b.get("text", "") for b in response["output"]["message"]["content"])
+            parsed = BedrockExtractor._parse_json(text)
+            candidate = parsed.get("verdict")
+            if isinstance(candidate, str) and candidate in VERDICT_OPTIONS:
+                verdict = candidate
+        except Exception as exc:  # noqa: BLE001 - any failure is a halt, like the gate
+            verdict = f"judge_error:{type(exc).__name__}"
+        rows.append(
+            JudgeRow(
+                document_id=doc.document_id,
+                category=doc.category,
+                expected_action=doc.expected_action,
+                verdict=verdict,
+                gated_action="PROCEED" if verdict == "fully_compliant" else "HALTED",
+                input_tokens=tokens_in,
+                output_tokens=tokens_out,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        )
+    return _judge_metrics(rows, model_id)
+
+
+def _judge_metrics(rows: list[JudgeRow], model_id: str) -> dict[str, Any]:
+    compliant = [r for r in rows if r.expected_action == "PROCEED"]
+    non_compliant = [r for r in rows if r.expected_action == "HALTED"]
+    latencies = sorted(r.latency_ms for r in rows)
+    cuts = statistics.quantiles(latencies, n=100, method="inclusive") if len(latencies) >= 2 else latencies * 100
+    tokens_in = sum(r.input_tokens for r in rows)
+    tokens_out = sum(r.output_tokens for r in rows)
+    per_category: dict[str, dict[str, int]] = {}
+    for r in rows:
+        bucket = per_category.setdefault(r.category, {"total": 0, "PROCEED": 0, "HALTED": 0, "correct": 0})
+        bucket["total"] += 1
+        bucket[r.gated_action] += 1
+        bucket["correct"] += int(r.gated_action == r.expected_action)
+    return {
+        "judge": model_id,
+        "documents": len(rows),
+        "accuracy_pct": round(100.0 * sum(r.gated_action == r.expected_action for r in rows) / len(rows), 2),
+        "hallucinated_approval_rate_pct": round(
+            100.0 * sum(r.gated_action == "PROCEED" for r in non_compliant) / len(non_compliant), 2
+        ) if non_compliant else 0.0,
+        "false_halt_rate_pct": round(
+            100.0 * sum(r.gated_action == "HALTED" for r in compliant) / len(compliant), 2
+        ) if compliant else 0.0,
+        "decision_input_tokens": tokens_in,
+        "decision_output_tokens": tokens_out,
+        "decision_cost_usd": round(
+            tokens_in * NOVA_LITE_INPUT_USD_PER_1K / 1000 + tokens_out * NOVA_LITE_OUTPUT_USD_PER_1K / 1000, 6
+        ),
+        "p50_latency_ms": round(cuts[49], 1),
+        "p95_latency_ms": round(cuts[94], 1),
+        "errors": sum(r.verdict.startswith("judge_error") for r in rows),
+        "per_category": per_category,
+        "rows": [asdict(r) for r in rows],
+    }
+
+
 # --- Rendering ------------------------------------------------------------------------------
 
 
@@ -518,7 +653,30 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="offline demo shorthand for --decider-mode heuristic --allow-heuristic-proceed",
     )
+    parser.add_argument(
+        "--llm-judge",
+        action="store_true",
+        help="baseline: ask Nova Lite the same typed question on the same documents (needs AWS credentials)",
+    )
     args = parser.parse_args(argv)
+
+    if args.llm_judge:
+        reference = date.today()
+        docs = build_heldout_documents(reference, args.seed) if args.heldout else build_core_documents(reference)
+        result = run_llm_judge(docs)
+        console = Console()
+        table = Table(title=f"LLM-only judge baseline: {result['judge']} (n={result['documents']})")
+        table.add_column("Metric")
+        table.add_column("Value", justify="right")
+        for key in ("accuracy_pct", "hallucinated_approval_rate_pct", "false_halt_rate_pct", "decision_input_tokens",
+                    "decision_output_tokens", "decision_cost_usd", "p50_latency_ms", "p95_latency_ms", "errors"):
+            table.add_row(key, str(result[key]))
+        console.print(table)
+        if args.json_out is not None:
+            args.json_out.parent.mkdir(parents=True, exist_ok=True)
+            args.json_out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            console.print(f"Metrics written to {args.json_out}")
+        return 0
 
     decider_mode: DeciderMode | None = args.decider_mode
     allow_heuristic_proceed: bool = args.allow_heuristic_proceed
@@ -539,6 +697,7 @@ def main(argv: list[str] | None = None) -> int:
         render_heldout(console, heldout)
         _render_decider_errors(console, heldout)
         payload: dict[str, Any] = heldout.metrics()
+        payload["rows"] = [asdict(r) for r in heldout.rows]
         exit_code = 0
     else:
         core = run_core_benchmark(

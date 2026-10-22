@@ -161,6 +161,11 @@ class StipGatePipeline:
             "decider_backend": decision.backend if decision is not None else None,
             "decider_latency_ms": round(decision.decider_latency_ms, 3) if decision is not None else 0.0,
             "decider_model": decision.model if decision is not None else None,
+            "requirement_checks": (
+                {name: round(p, 4) for name, p in decision.checks.items()}
+                if decision is not None and decision.checks is not None
+                else None
+            ),
             "llm_model": None,
             "total_latency_ms": latency_ms,
             "review_ticket_id": decision.ticket_id if decision is not None else None,
