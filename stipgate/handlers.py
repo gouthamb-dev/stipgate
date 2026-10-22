@@ -542,7 +542,7 @@ class StipulationGuardrailHandler(InterventionHandler):
         )
         feedback = (
             f"StipGate HALTED {self.target_tool} for {condition_code or 'UNKNOWN'}: "
-            f"Decider 2B verdict={verdict} confidence={confidence:.3f} "
+            f"verdict={verdict} ({reason}); Decider 2B document-type confidence={confidence:.3f} "
             f"(threshold {self.confidence_threshold:.2f}). Zero LLM tokens spent. "
             f"Routed to human loan officer review queue (ticket {ticket.ticket_id}). "
             "Do not retry clearing this condition; tell the borrower a loan officer will review the document."
