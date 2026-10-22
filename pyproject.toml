@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stipgate"
+version = "1.0.0"
+description = "StipGate: Edge-Gated Mortgage Trailing Document Clearance with Strands Decider 2B and Amazon Bedrock Nova Lite"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "strands-agents==1.61.1",
+    "boto3==1.43.115",
+    "botocore==1.43.115",
+    "pydantic==2.14.1",
+    "rich==15.0.0",
+    "fastapi==0.149.0",
+    "uvicorn==0.54.0",
+    "pypdf==6.21.2",
+]
+
+authors = [{ name = "Goutham B" }]
+keywords = ["strands-agents", "strands-decider", "amazon-bedrock", "guardrails", "mortgage", "llm-agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Office/Business :: Financial",
+]
+
+[project.urls]
+Homepage = "https://github.com/gouthamb-dev/stipgate"
+Documentation = "https://github.com/gouthamb-dev/stipgate/tree/main/docs"
+Issues = "https://github.com/gouthamb-dev/stipgate/issues"
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "mypy==2.4.0", "httpx==0.28.1"]
+
+[project.scripts]
+stipgate-serve = "stipgate.api:main"
+
+[tool.setuptools]
+packages = ["stipgate"]
+
+[tool.setuptools.package-data]
+stipgate = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["stipgate", "benchmark.py", "tests"]
+
+[[tool.mypy.overrides]]
+# boto3/botocore ship without inline type stubs; the boundary is wrapped in typed Protocols.
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true

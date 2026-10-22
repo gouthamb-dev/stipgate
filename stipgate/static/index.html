@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StipGate test console</title>
+<style>
+  :root {
+    --text: #1a1a1a;
+    --bg: #ffffff;
+    --muted: #4a4a4a;
+    --border: #767676;
+    --panel: #f5f5f5;
+    --focus: #0b57d0;
+    --ok-fg: #0b6b2b;
+    --ok-bg: #e6f4ea;
+    --bad-fg: #a4161a;
+    --bad-bg: #fdecea;
+    --warn-fg: #5c3c00;
+    --warn-bg: #fff4d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+  }
+  header, main { max-width: 72rem; margin: 0 auto; padding: 1rem 1.25rem; }
+  header { border-bottom: 1px solid var(--border); }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.25rem; margin: 1.5rem 0 .5rem; }
+  p.tagline { margin: 0; color: var(--muted); }
+  .skip-link { position: absolute; left: -9999px; top: 0; }
+  .skip-link:focus { left: 1rem; top: 1rem; background: var(--bg); padding: .5rem; z-index: 10; }
+  .banner {
+    background: var(--warn-bg); color: var(--warn-fg);
+    border: 2px solid var(--warn-fg); border-radius: 4px;
+    padding: .75rem 1rem; margin: 1rem 0; font-weight: 600;
+  }
+  .error {
+    background: var(--bad-bg); color: var(--bad-fg);
+    border: 2px solid var(--bad-fg); border-radius: 4px;
+    padding: .75rem 1rem; margin: 1rem 0; font-weight: 600;
+  }
+  .health { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 4px; padding: .5rem 1rem; margin: 1rem 0 0; }
+  .health dt { font-weight: 600; display: inline; }
+  .health dd { display: inline; margin: 0 0 0 .25rem; }
+  .health div { white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; }
+  @media (max-width: 52rem) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  fieldset { border: 1px solid var(--border); border-radius: 4px; padding: .75rem 1rem 1rem; margin: 0 0 1rem; }
+  legend { font-weight: 600; padding: 0 .25rem; }
+  label { display: block; font-weight: 600; margin: .75rem 0 .25rem; }
+  .hint { color: var(--muted); font-size: .9rem; margin: .25rem 0 0; }
+  input[type="text"], input[type="password"], select, textarea {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 4px; padding: .5rem;
+  }
+  textarea { min-height: 16rem; font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: .9rem; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: .5rem 1rem; margin: .25rem .5rem .25rem 0;
+  }
+  button.primary { color: #ffffff; background: #1a1a1a; border-color: #1a1a1a; }
+  button:disabled { cursor: not-allowed; opacity: .6; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .samples { display: flex; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: .1rem .6rem; border-radius: 4px; font-weight: 700; border: 2px solid currentColor; }
+  .badge.proceed { color: var(--ok-fg); background: var(--ok-bg); }
+  .badge.halted { color: var(--bad-fg); background: var(--bad-bg); }
+  dl.result { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .35rem 1rem; margin: 0; }
+  dl.result dt { font-weight: 600; }
+  dl.result dd { margin: 0; overflow-wrap: anywhere; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; }
+  caption { text-align: left; font-weight: 600; padding: .25rem 0; }
+  th, td { border: 1px solid var(--border); padding: .35rem .5rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  th { background: var(--panel); }
+  .table-wrap { overflow-x: auto; }
+  .note { color: var(--warn-fg); background: var(--warn-bg); padding: .5rem; border-radius: 4px; margin: .5rem 0 0; }
+  .muted { color: var(--muted); }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header>
+  <h1>StipGate test console</h1>
+  <p class="tagline">Edge-gated mortgage trailing document clearance: Decider 2B gate, then Bedrock Nova Lite extraction.</p>
+  <dl class="health" id="health" aria-label="Service health">
+    <div><dt>Decider mode:</dt><dd id="health-mode">loading</dd></div>
+    <div><dt>Decider reachable:</dt><dd id="health-reachable">loading</dd></div>
+    <div><dt>Bedrock:</dt><dd id="health-bedrock">loading</dd></div>
+    <div><dt>Authentication:</dt><dd id="health-auth">loading</dd></div>
+  </dl>
+</header>
+<main id="main">
+  <div id="heuristic-banner" class="banner" role="alert" hidden>Heuristic backend: verdicts are simulated, not Decider 2B</div>
+  <div id="error" class="error" role="alert" hidden></div>
+
+  <div class="grid">
+    <section aria-labelledby="submit-heading">
+      <h2 id="submit-heading">Evaluate a trailing document</h2>
+      <form id="evaluate-form" novalidate>
+        <fieldset>
+          <legend>Access</legend>
+          <label for="api-key">API key (optional)</label>
+          <input type="password" id="api-key" autocomplete="off" aria-describedby="api-key-hint">
+          <p class="hint" id="api-key-hint">Kept in page memory only and sent as the X-API-Key header. Required when the server sets STIPGATE_API_KEY.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Sample documents</legend>
+          <div class="samples" id="sample-buttons"><span class="muted" id="samples-status">Loading samples...</span></div>
+          <button type="button" id="reload-samples">Reload samples</button>
+        </fieldset>
+        <fieldset>
+          <legend>Document</legend>
+          <label for="document-id">Document ID</label>
+          <input type="text" id="document-id" name="document_id" required maxlength="64" pattern="[A-Za-z0-9._:\-]+" autocomplete="off" aria-describedby="document-id-hint" value="DOC-001">
+          <p class="hint" id="document-id-hint">1-64 characters: letters, digits, dot, underscore, colon or hyphen.</p>
+
+          <label for="condition-code">Condition code</label>
+          <select id="condition-code" name="condition_code" required>
+            <option value="STIP_INCOME_30DAY">STIP_INCOME_30DAY (30-day paystub)</option>
+            <option value="STIP_W2_2YR">STIP_W2_2YR (two years of W-2s)</option>
+            <option value="STIP_ASSET_2MO">STIP_ASSET_2MO (two months of bank statements)</option>
+          </select>
+
+          <label for="file-input">Upload a file (optional)</label>
+          <input type="file" id="file-input" accept=".txt,.pdf,.png,.jpg,.jpeg,.gif,.webp,text/plain,application/pdf,image/png,image/jpeg,image/gif,image/webp" aria-describedby="file-hint file-status">
+          <p class="hint" id="file-hint">A .txt file fills the OCR text box in your browser. A PDF or image (PNG, JPEG, GIF, WebP) is sent to the server: text-based PDFs are read locally, scanned PDFs and images are transcribed by Nova Lite (this spends tokens before the gate runs). Max 4 MB.</p>
+          <p class="hint" id="file-status" aria-live="polite"></p>
+          <button type="button" id="upload-button" disabled>Upload and evaluate file</button>
+
+          <label for="snippet">OCR text</label>
+          <textarea id="snippet" name="snippet" required maxlength="50000" spellcheck="false" aria-describedby="snippet-count snippet-hint"></textarea>
+          <p class="hint" id="snippet-count">0 of 50000 characters</p>
+          <p class="hint" id="snippet-hint">Press Ctrl+Enter in the text box to submit.</p>
+        </fieldset>
+        <button type="submit" class="primary" id="submit-button">Evaluate document</button>
+      </form>
+    </section>
+
+    <section aria-labelledby="result-heading">
+      <h2 id="result-heading">Gate result</h2>
+      <section id="result" aria-live="polite" aria-atomic="true">
+        <p class="muted" id="result-empty">No document evaluated yet.</p>
+        <dl class="result" id="result-list" hidden></dl>
+        <h3 id="payload-heading" hidden>Extracted payload</h3>
+        <div id="payload"></div>
+        <p class="note" id="synthetic-note" hidden></p>
+      </section>
+    </section>
+  </div>
+
+  <section aria-labelledby="queue-heading">
+    <h2 id="queue-heading">Human review queue</h2>
+    <button type="button" id="refresh-queue">Refresh queue</button>
+    <div class="table-wrap">
+      <table>
+        <caption id="queue-caption">Tickets routed to the loan officer queue</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ticket</th>
+            <th scope="col">Document</th>
+            <th scope="col">Condition</th>
+            <th scope="col">Verdict</th>
+            <th scope="col">Confidence</th>
+            <th scope="col">Reason</th>
+            <th scope="col">Created</th>
+          </tr>
+        </thead>
+        <tbody id="queue-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  var MAX_CHARS = 50000;
+  var el = function (id) { return document.getElementById(id); };
+  var apiKeyInput = el("api-key");
+  var errorBox = el("error");
+  var banner = el("heuristic-banner");
+  var heuristicFromHealth = false;
+  var authEnabled = false;
+
+  function clearChildren(node) {
+    while (node.firstChild) { node.removeChild(node.firstChild); }
+  }
+
+  function text(value) {
+    if (value === null || value === undefined || value === "") { return "None"; }
+    if (Array.isArray(value)) { return value.length ? value.join(", ") : "None"; }
+    if (typeof value === "object") { return JSON.stringify(value); }
+    return String(value);
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.textContent = "";
+    errorBox.hidden = true;
+  }
+
+  function setBanner(visible) {
+    banner.hidden = !visible;
+  }
+
+  function headers(json) {
+    var h = { "Accept": "application/json" };
+    if (json) { h["Content-Type"] = "application/json"; }
+    var key = apiKeyInput.value;
+    if (key) { h["X-API-Key"] = key; }
+    return h;
+  }
+
+  function detailOf(body) {
+    if (!body || body.detail === undefined) { return ""; }
+    if (typeof body.detail === "string") { return body.detail; }
+    if (Array.isArray(body.detail)) {
+      return body.detail.map(function (d) {
+        var loc = Array.isArray(d.loc) ? d.loc.join(".") : "";
+        return (loc ? loc + ": " : "") + (d.msg || JSON.stringify(d));
+      }).join("; ");
+    }
+    return JSON.stringify(body.detail);
+  }
+
+  function parseResponse(response) {
+    return response.text().then(function (raw) {
+      var body = null;
+      try { body = raw ? JSON.parse(raw) : null; } catch (e) { body = null; }
+      if (!response.ok) {
+        var detail = detailOf(body) || raw || response.statusText;
+        throw new Error("HTTP " + response.status + ": " + detail);
+      }
+      return body;
+    });
+  }
+
+  function request(method, path, payload) {
+    var init = { method: method, headers: headers(payload !== undefined), cache: "no-store" };
+    if (payload !== undefined) { init.body = JSON.stringify(payload); }
+    return fetch(path, init).then(parseResponse);
+  }
+
+  function uploadFile(path, file) {
+    var h = headers(false);
+    h["Content-Type"] = file.type || "application/octet-stream";
+    return fetch(path, { method: "POST", headers: h, body: file, cache: "no-store" }).then(parseResponse);
+  }
+
+  function loadHealth() {
+    return request("GET", "/healthz").then(function (h) {
+      var d = h.decider || {};
+      var b = h.bedrock || {};
+      el("health-mode").textContent = d.mode === "server" ? "server (live Decider 2B model)" :
+        (d.mode === "heuristic" ? "heuristic (simulated, no model)" : text(d.mode));
+      el("health-reachable").textContent =
+        d.reachable === null || d.reachable === undefined ? "not probed (heuristic)" : (d.reachable ? "yes" : "no");
+      el("health-bedrock").textContent = b.offline ? "offline (synthetic fallback)" :
+        (b.client_configured ? text(b.model_id) + " in " + text(b.region) : "no client (fallback)");
+      authEnabled = h.auth_enabled === true;
+      el("health-auth").textContent = authEnabled ? "API key required" : "disabled";
+      heuristicFromHealth = d.mode === "heuristic" || d.mode === "auto";
+      setBanner(heuristicFromHealth);
+    }).catch(function (err) { showError("Health check failed. " + err.message); });
+  }
+
+  function loadSamples() {
+    var container = el("sample-buttons");
+    return request("GET", "/v1/samples").then(function (data) {
+      clearChildren(container);
+      (data.samples || []).forEach(function (s) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Load " + s.category;
+        btn.setAttribute("aria-label", "Load sample " + s.document_id + ": " + s.category +
+          " (expected " + s.expected_action + ")");
+        btn.addEventListener("click", function () {
+          el("document-id").value = s.document_id;
+          el("condition-code").value = s.condition_code;
+          el("snippet").value = s.snippet;
+          updateCount();
+          el("snippet").focus();
+        });
+        container.appendChild(btn);
+      });
+      if (!container.firstChild) {
+        var none = document.createElement("span");
+        none.className = "muted";
+        none.textContent = "No samples available.";
+        container.appendChild(none);
+      }
+    }).catch(function (err) {
+      clearChildren(container);
+      var span = document.createElement("span");
+      span.className = "muted";
+      span.textContent = "Samples unavailable (" + err.message + "). Enter an API key and reload.";
+      container.appendChild(span);
+    });
+  }
+
+  function addRow(list, label, value) {
+    var dt = document.createElement("dt");
+    dt.textContent = label;
+    var dd = document.createElement("dd");
+    if (value instanceof Node) { dd.appendChild(value); } else { dd.textContent = text(value); }
+    list.appendChild(dt);
+    list.appendChild(dd);
+  }
+
+  function actionBadge(action) {
+    var span = document.createElement("span");
+    var proceed = action === "PROCEED";
+    span.className = "badge " + (proceed ? "proceed" : "halted");
+    span.textContent = proceed ? "\u2714 PROCEED" : "\u2716 HALTED";
+    return span;
+  }
+
+  function fixed(value, digits) {
+    return typeof value === "number" && isFinite(value) ? value.toFixed(digits) : text(value);
+  }
+
+  function renderPayload(payload) {
+    var container = el("payload");
+    clearChildren(container);
+    el("payload-heading").hidden = false;
+    if (!payload || typeof payload !== "object") {
+      var p = document.createElement("p");
+      p.textContent = "None";
+      container.appendChild(p);
+      return;
+    }
+    var table = document.createElement("table");
+    var caption = document.createElement("caption");
+    caption.textContent = "Income clearance payload";
+    table.appendChild(caption);
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    ["Field", "Value"].forEach(function (name) {
+      var th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = name;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    Object.keys(payload).forEach(function (k) {
+      var tr = document.createElement("tr");
+      var th = document.createElement("th");
+      th.scope = "row";
+      th.textContent = k;
+      var td = document.createElement("td");
+      td.textContent = text(payload[k]);
+      tr.appendChild(th);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  function renderResult(t) {
+    var list = el("result-list");
+    clearChildren(list);
+    el("result-empty").hidden = true;
+    list.hidden = false;
+    addRow(list, "Document ID", t.document_id);
+    if (t.ocr && typeof t.ocr === "object") {
+      var o = t.ocr;
+      var how;
+      if (o.method === "nova_lite_ocr") {
+        how = "Nova Lite OCR (" + text(o.model_id) + "): " + fixed(o.latency_ms, 1) + " ms, " +
+          text(o.input_tokens) + " in / " + text(o.output_tokens) + " out tokens (spent before the gate)";
+      } else if (o.method === "pdf_text_layer") {
+        how = "PDF text layer, read locally: " + fixed(o.latency_ms, 1) + " ms, 0 tokens";
+      } else {
+        how = "plain text, read locally: 0 tokens";
+      }
+      how += "; " + text(o.chars) + " characters" + (o.pages ? ", " + o.pages + " page(s)" : "");
+      addRow(list, "0. Text extraction", how);
+    }
+    addRow(list, "Gated action", actionBadge(t.gated_action));
+    addRow(list, "Verdict", t.verdict);
+    addRow(list, "Confidence", fixed(t.confidence, 3));
+    addRow(list, "Decider 2B model", t.decider_model ? t.decider_model :
+      (t.decider_backend === "heuristic" ? "heuristic simulator (NOT the model)" : "not reported"));
+    addRow(list, "Decider source", t.decider_backend === "server" ? "live Decider 2B model server" :
+      (t.decider_backend === "heuristic" ? "heuristic simulator" : "none (fail closed)"));
+    addRow(list, "1. Decider 2B gate (ms)", fixed(t.decider_latency_ms, 1));
+    var llm;
+    if (t.gated_action !== "PROCEED") {
+      llm = "skipped: halted by the gate, 0 tokens";
+    } else if (t.extraction_is_fallback) {
+      llm = "not called (fallback: " + text(t.extraction_fallback_reason) + "), " + fixed(t.extraction_latency_ms, 1) + " ms";
+    } else {
+      llm = text(t.llm_model) + ": " + fixed(t.extraction_latency_ms, 1) + " ms, " +
+        text(t.input_tokens) + " in / " + text(t.output_tokens) + " out tokens";
+    }
+    addRow(list, "2. Bedrock LLM call", llm);
+    addRow(list, "Total (ms)", fixed(t.total_latency_ms !== undefined ? t.total_latency_ms : t.latency_ms, 1));
+    addRow(list, "Clearance status", t.clearance_status);
+    addRow(list, "Tokens spent", t.tokens_spent);
+    var tickets = [t.review_ticket_id, t.extraction_review_ticket_id].filter(function (x) { return !!x; });
+    addRow(list, "Review ticket IDs", tickets);
+    addRow(list, "Guardrail feedback", t.guardrail_feedback);
+    renderPayload(t.extracted_payload);
+    var note = el("synthetic-note");
+    var synthetic = Array.isArray(t.extraction_synthetic_fields) ? t.extraction_synthetic_fields : [];
+    if (t.extraction_is_fallback) {
+      note.textContent = "Extraction fell back (" + text(t.extraction_fallback_reason) +
+        "). Synthetic fields: " + text(synthetic) + ". A loan officer must verify these figures.";
+      note.hidden = false;
+    } else {
+      note.textContent = "";
+      note.hidden = true;
+    }
+    setBanner(heuristicFromHealth || t.heuristic_warning === true || t.decider_backend === "heuristic");
+  }
+
+  function loadQueue() {
+    var body = el("queue-body");
+    return request("GET", "/v1/review-queue").then(function (data) {
+      clearChildren(body);
+      var items = data.items || [];
+      el("queue-caption").textContent = "Tickets routed to the loan officer queue (" + items.length + ")";
+      items.forEach(function (it) {
+        var tr = document.createElement("tr");
+        [it.ticket_id, it.document_id, it.condition_code, it.verdict, fixed(it.confidence, 3), it.reason, it.created_at]
+          .forEach(function (v) {
+            var td = document.createElement("td");
+            td.textContent = text(v);
+            tr.appendChild(td);
+          });
+        body.appendChild(tr);
+      });
+    }).catch(function (err) { showError("Review queue unavailable. " + err.message); });
+  }
+
+  function updateCount() {
+    el("snippet-count").textContent = el("snippet").value.length + " of " + MAX_CHARS + " characters";
+  }
+
+  function submit() {
+    clearError();
+    var payload = {
+      document_id: el("document-id").value.trim(),
+      condition_code: el("condition-code").value,
+      snippet: el("snippet").value
+    };
+    if (!payload.document_id) { showError("Document ID is required."); el("document-id").focus(); return; }
+    if (!payload.snippet) { showError("OCR text is required."); el("snippet").focus(); return; }
+    var button = el("submit-button");
+    button.disabled = true;
+    button.textContent = "Evaluating...";
+    request("POST", "/v1/documents/evaluate", payload)
+      .then(function (trace) { renderResult(trace); return loadQueue(); })
+      .catch(function (err) { showError("Evaluation failed. " + err.message); })
+      .then(function () { button.disabled = false; button.textContent = "Evaluate document"; });
+  }
+
+  var MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+  var fileInput = el("file-input");
+  var fileStatus = el("file-status");
+  var uploadButton = el("upload-button");
+  var selectedFile = null;
+
+  function isTextFile(file) {
+    return file.type === "text/plain" || /\.txt$/i.test(file.name);
+  }
+
+  function resetFile(message) {
+    selectedFile = null;
+    uploadButton.disabled = true;
+    fileStatus.textContent = message || "";
+  }
+
+  fileInput.addEventListener("change", function () {
+    clearError();
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) { resetFile(""); return; }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      resetFile("");
+      showError(file.name + " is larger than 4 MB.");
+      return;
+    }
+    if (isTextFile(file)) {
+      resetFile("Reading " + file.name + "...");
+      file.text().then(function (content) {
+        if (content.length > MAX_CHARS) {
+          resetFile("");
+          showError(file.name + " has " + content.length + " characters; the limit is " + MAX_CHARS + ".");
+          return;
+        }
+        el("snippet").value = content;
+        updateCount();
+        resetFile("Loaded " + file.name + " (" + content.length + " characters) into the OCR text box. Review it, then choose Evaluate document.");
+      }).catch(function () {
+        resetFile("");
+        showError("Could not read " + file.name + " as text.");
+      });
+      return;
+    }
+    selectedFile = file;
+    uploadButton.disabled = false;
+    fileStatus.textContent = "Ready: " + file.name + " (" + Math.ceil(file.size / 1024) + " KB). Choose Upload and evaluate file.";
+  });
+
+  uploadButton.addEventListener("click", function () {
+    clearError();
+    if (!selectedFile) { return; }
+    var documentId = el("document-id").value.trim();
+    if (!documentId) { showError("Document ID is required."); el("document-id").focus(); return; }
+    var path = "/v1/documents/upload?document_id=" + encodeURIComponent(documentId) +
+      "&condition_code=" + encodeURIComponent(el("condition-code").value);
+    var name = selectedFile.name;
+    uploadButton.disabled = true;
+    uploadButton.textContent = "Uploading and evaluating...";
+    fileStatus.textContent = "Extracting text from " + name + "...";
+    uploadFile(path, selectedFile)
+      .then(function (trace) {
+        if (typeof trace.extracted_text === "string") {
+          el("snippet").value = trace.extracted_text;
+          updateCount();
+        }
+        fileStatus.textContent = "Evaluated " + name + ". The extracted text is in the OCR text box.";
+        renderResult(trace);
+        return loadQueue();
+      })
+      .catch(function (err) {
+        fileStatus.textContent = "";
+        showError("Upload failed. " + err.message);
+      })
+      .then(function () {
+        uploadButton.disabled = !selectedFile;
+        uploadButton.textContent = "Upload and evaluate file";
+      });
+  });
+
+  el("evaluate-form").addEventListener("submit", function (e) { e.preventDefault(); submit(); });
+  el("snippet").addEventListener("input", updateCount);
+  el("snippet").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); }
+  });
+  el("refresh-queue").addEventListener("click", function () { clearError(); loadQueue(); });
+  el("reload-samples").addEventListener("click", function () { clearError(); loadSamples(); loadHealth(); loadQueue(); });
+
+  updateCount();
+  loadHealth().then(function () {
+    // With auth enabled, wait for the user to enter a key instead of raising a 401 alert on load.
+    if (!authEnabled) { loadQueue(); }
+  });
+  loadSamples();
+})();
+</script>
+</body>
+</html>

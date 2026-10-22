@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+      # Fully offline: urlopen is patched in the tests, no Decider server and no AWS credentials needed.
+      - name: Tests
+        run: python -m pytest -q
+      - name: Type check (strict)
+        run: python -m mypy
+      - name: Offline benchmark (heuristic, expects PROCEED/HALTED/PROCEED/HALTED)
+        run: python benchmark.py --offline --heuristic
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t stipgate-api:ci .
+      - name: Validate compose file
+        run: docker compose config -q

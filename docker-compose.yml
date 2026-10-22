@@ -1,0 +1,72 @@
+# StipGate local stack: StipGate API + Strands Decider 2B CPU sidecar.
+#
+#   docker compose up --build decider stipgate-api      # real Decider (CPU, slow first start)
+#   docker compose --profile demo up --build stipgate-demo  # heuristic demo, no model download
+#
+# No `version:` key (obsolete in the Compose spec). Ports bind to 127.0.0.1 only. The Decider
+# service publishes no port: StipGate reaches it on the compose network at decider:8099.
+#
+# GPU variant (comments only, not validated here): build the upstream
+# deploy/sagemaker/Dockerfile with DEVICE=cuda, set DECIDER_DEVICE=cuda, lower
+# STIPGATE_DECIDER_TIMEOUT_S to 1.5, and give the decider service a GPU, e.g.
+#     gpus: all
+# or
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: 1
+#               capabilities: [gpu]
+
+services:
+  decider:
+    build: ./docker/decider
+    volumes:
+      - hf-cache:/opt/hf
+    # No published ports; healthcheck is inherited from docker/decider/Dockerfile.
+
+  stipgate-api:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      STIPGATE_DECIDER_MODE: server
+      STIPGATE_DECIDER_URL: http://decider:8099/v1/systemone
+      # CPU Decider takes ~1.6-2.5 s per ask; lower to 1.5 on GPU.
+      STIPGATE_DECIDER_TIMEOUT_S: "5"
+      STIPGATE_API_KEY: ${STIPGATE_API_KEY:-}
+      STIPGATE_BEDROCK_OFFLINE: ${STIPGATE_BEDROCK_OFFLINE:-1}
+      # Static AWS keys pass through from the host shell (empty values are ignored by botocore).
+      # AWS_PROFILE is deliberately NOT passed: Compose renders an unset ${AWS_PROFILE:-} as "",
+      # boto3 treats that as a profile named "" (ProfileNotFound) and Nova Lite is never called.
+      # To use a named profile, add a docker-compose.override.yml for stipgate-api with:
+      #   volumes:
+      #     - ${HOME}/.aws:/aws:ro
+      #   environment:
+      #     AWS_CONFIG_FILE: /aws/config
+      #     AWS_SHARED_CREDENTIALS_FILE: /aws/credentials
+      #     AWS_PROFILE: your-profile-name
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    depends_on:
+      decider:
+        # The API starts immediately and fails closed (HALTED, human review, 0 tokens) until the
+        # Decider is healthy; /healthz reports decider.reachable.
+        condition: service_started
+
+  stipgate-demo:
+    profiles: ["demo"]
+    build: .
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      # Simulated verdicts for laptops without the model. Never use for real loan files.
+      STIPGATE_DECIDER_MODE: heuristic
+      STIPGATE_ALLOW_HEURISTIC_PROCEED: "1"
+      STIPGATE_API_KEY: ${STIPGATE_API_KEY:-}
+      STIPGATE_BEDROCK_OFFLINE: "1"
+
+volumes:
+  hf-cache: {}
