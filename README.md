@@ -8,6 +8,8 @@
 
 `#strands-decider-2b` `#guardrails` · Built for the AWS Builder Center *Agent Experience Hackathon: Strands Decider*
 
+**▶ Demo video (under 3 min): [StipGate guardrails stop bad mortgage documents](https://www.loom.com/share/2c705d498d9344fa9f2ff61960cf49e3)**
+
 A Strands agent wants to call `clear_underwriting_condition` on an uploaded document. Before the tool runs,
 a Strands `InterventionHandler` makes **one Decider 2B call** that answers two kinds of typed question:
 *is this the document the condition requires?* (a `choice`) and *is the required content there?* (yes/no
