@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="t d">
+  <title id="t">StipGate: a Strands Decider 2B guardrail for mortgage documents</title>
+  <desc id="d">A document flows through Decider 2B and a date check before Amazon Bedrock Nova Lite. On 100 test documents StipGate approved 0 of 55 bad documents; Nova Lite alone approved 31 of 55.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#14213d"/>
+    </linearGradient>
+    <linearGradient id="gate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff9f1c"/>
+      <stop offset="1" stop-color="#f77f00"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8aa0c8"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <!-- subtle grid -->
+  <g stroke="#1e2b4a" stroke-width="1" opacity="0.6">
+    <path d="M0 150 H1600 M0 300 H1600 M0 450 H1600 M0 600 H1600 M0 750 H1600"/>
+    <path d="M200 0 V900 M400 0 V900 M600 0 V900 M800 0 V900 M1000 0 V900 M1200 0 V900 M1400 0 V900"/>
+  </g>
+
+  <!-- Title -->
+  <text x="90" y="135" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="96" font-weight="800" fill="#ffffff">StipGate</text>
+  <text x="90" y="195" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="36" font-weight="500" fill="#c9d6f0">A Strands Decider 2B guardrail that checks mortgage documents</text>
+  <text x="90" y="240" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="36" font-weight="500" fill="#c9d6f0">before an LLM can wrongly approve them</text>
+
+  <!-- Flow -->
+  <g font-family="Segoe UI, Inter, Arial, sans-serif" filter="url(#shadow)">
+    <!-- document -->
+    <g transform="translate(90,320)">
+      <rect width="190" height="240" rx="14" fill="#f5f7fb"/>
+      <path d="M150 0 L190 40 L150 40 Z" fill="#d5dbe8"/>
+      <text x="22" y="48" font-size="20" font-weight="700" fill="#1a1a1a">EARNINGS</text>
+      <text x="22" y="72" font-size="20" font-weight="700" fill="#1a1a1a">STATEMENT</text>
+      <rect x="22" y="94" width="140" height="10" rx="5" fill="#c3cbdb"/>
+      <rect x="22" y="116" width="110" height="10" rx="5" fill="#c3cbdb"/>
+      <rect x="22" y="138" width="130" height="10" rx="5" fill="#c3cbdb"/>
+      <rect x="22" y="160" width="90" height="10" rx="5" fill="#c3cbdb"/>
+      <text x="22" y="210" font-size="17" fill="#4a4a4a">Pay period: Jul 19</text>
+      <g transform="translate(95,142) rotate(-12)">
+        <rect x="-68" y="-24" width="136" height="48" rx="8" fill="#f5f7fb" fill-opacity="0.85" stroke="#d62828" stroke-width="5"/>
+        <text x="0" y="10" font-size="27" font-weight="900" fill="#d62828" text-anchor="middle">HALTED</text>
+      </g>
+    </g>
+
+    <!-- Decider -->
+    <g transform="translate(370,330)">
+      <rect width="300" height="220" rx="18" fill="url(#gate)"/>
+      <text x="150" y="52" font-size="30" font-weight="800" fill="#1a1a1a" text-anchor="middle">Decider 2B</text>
+      <text x="150" y="82" font-size="18" font-weight="600" fill="#2b1a00" text-anchor="middle">one local request</text>
+      <text x="26" y="128" font-size="20" fill="#1a1a1a">• Right document?</text>
+      <text x="26" y="160" font-size="20" fill="#1a1a1a">• Employer + YTD there?</text>
+      <text x="26" y="192" font-size="20" fill="#1a1a1a">• Both W-2 years?</text>
+    </g>
+
+    <!-- Code date rule -->
+    <g transform="translate(760,360)">
+      <rect width="230" height="160" rx="18" fill="#2a9d8f"/>
+      <text x="115" y="58" font-size="28" font-weight="800" fill="#ffffff" text-anchor="middle">Code</text>
+      <text x="115" y="96" font-size="20" fill="#eafaf7" text-anchor="middle">date within</text>
+      <text x="115" y="124" font-size="20" fill="#eafaf7" text-anchor="middle">30 days?</text>
+    </g>
+
+    <!-- Bedrock -->
+    <g transform="translate(1080,360)">
+      <rect width="230" height="160" rx="18" fill="#4361ee"/>
+      <text x="115" y="58" font-size="28" font-weight="800" fill="#ffffff" text-anchor="middle">Nova Lite</text>
+      <text x="115" y="96" font-size="20" fill="#e6ebff" text-anchor="middle">Amazon Bedrock</text>
+      <text x="115" y="124" font-size="20" fill="#e6ebff" text-anchor="middle">extracts the pay</text>
+    </g>
+  </g>
+
+  <!-- arrows -->
+  <g stroke="#8aa0c8" stroke-width="5" fill="none" marker-end="url(#arrow)">
+    <path d="M292 440 H360"/>
+    <path d="M682 440 H750"/>
+    <path d="M1002 440 H1070"/>
+  </g>
+  <!-- halt branch -->
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <path d="M520 560 V610" stroke="#d62828" stroke-width="4" fill="none" stroke-dasharray="10 8"/>
+    <path d="M875 530 V610" stroke="#d62828" stroke-width="4" fill="none" stroke-dasharray="10 8"/>
+    <rect x="440" y="610" width="520" height="50" rx="25" fill="#0b1220" stroke="#d62828" stroke-width="3"/>
+    <text x="700" y="643" font-size="23" font-weight="700" fill="#ff6b6b" text-anchor="middle">any "no" → human review · 0 LLM tokens</text>
+  </g>
+
+  <!-- Result panel -->
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <rect x="1360" y="300" width="200" height="350" rx="18" fill="#101a30" stroke="#2c3e66" stroke-width="2"/>
+    <text x="1460" y="340" font-size="18" font-weight="600" fill="#8aa0c8" text-anchor="middle">100 test docs</text>
+    <text x="1460" y="368" font-size="18" font-weight="600" fill="#8aa0c8" text-anchor="middle">bad ones approved</text>
+    <text x="1460" y="450" font-size="76" font-weight="900" fill="#52d68a" text-anchor="middle">0/55</text>
+    <text x="1460" y="482" font-size="20" font-weight="700" fill="#52d68a" text-anchor="middle">StipGate</text>
+    <line x1="1390" y1="510" x2="1530" y2="510" stroke="#2c3e66" stroke-width="2"/>
+    <text x="1460" y="578" font-size="56" font-weight="900" fill="#ff6b6b" text-anchor="middle">31/55</text>
+    <text x="1460" y="610" font-size="20" font-weight="700" fill="#ff6b6b" text-anchor="middle">Nova Lite alone</text>
+  </g>
+
+  <!-- Footer -->
+  <g font-family="Segoe UI, Inter, Arial, sans-serif">
+    <text x="90" y="790" font-size="34" font-weight="700" fill="#ffffff">Decider judges meaning. Code checks numbers. The LLM only sees what passed.</text>
+    <text x="90" y="845" font-size="26" fill="#8aa0c8">#strands-decider-2b   #guardrails   ·   Strands Agents + Amazon Bedrock   ·   github.com/gouthamb-dev/stipgate</text>
+  </g>
+</svg>

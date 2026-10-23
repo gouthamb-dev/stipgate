@@ -1,5 +1,7 @@
 # StipGate
 
+![StipGate: Decider 2B checks the document, code checks the date, and only then does Nova Lite extract. On 100 test documents StipGate approved 0 of 55 bad documents; Nova Lite alone approved 31 of 55.](docs/images/cover.png)
+
 **A Strands Decider 2B guardrail that checks a borrower's mortgage document before any LLM token is spent on it.**
 
 [![CI](https://github.com/gouthamb-dev/stipgate/actions/workflows/ci.yml/badge.svg)](https://github.com/gouthamb-dev/stipgate/actions/workflows/ci.yml)
